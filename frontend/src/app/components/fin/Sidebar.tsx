@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { AlertTriangle, Cpu, Brain, Clock, TrendingUp, TrendingDown, Activity } from 'lucide-react';
 import { C } from './colors';
+import type { AlertItem } from './useLiveData';
 
 interface StatCardProps {
   label: string;
@@ -39,7 +40,7 @@ function StatCard({ label, value, sub, borderColor, icon, trend, tooltip }: Stat
   );
 }
 
-export function Sidebar() {
+export function Sidebar({ liveAlerts }: { liveAlerts?: AlertItem[] }) {
   const [elapsed, setElapsed] = useState(154);
 
   useEffect(() => {
@@ -80,12 +81,12 @@ export function Sidebar() {
 
       <StatCard
         label="Active Alerts"
-        value="7"
-        sub="↑ 2 since last check"
+        value={String(liveAlerts ? liveAlerts.filter(a => !a.acked).length : 7)}
+        sub={liveAlerts ? `${liveAlerts.filter(a => a.sev === 'critical' && !a.acked).length} critical` : '↑ 2 since last check'}
         borderColor={C.red}
         icon={<AlertTriangle size={12} />}
         trend="up"
-        tooltip="Demo data — not connected to live alert feed"
+        tooltip="Live alert count from notification feed"
       />
       <StatCard
         label="Models Running"
@@ -101,7 +102,7 @@ export function Sidebar() {
         sub="↑ 1.4% from baseline"
         borderColor={C.green}
         icon={<Brain size={12} />}
-        tooltip="Demo data — aggregated from last model runs"}
+        tooltip="Demo data — aggregated from last model runs"
         trend={null}
       />
       <StatCard
@@ -146,29 +147,35 @@ export function Sidebar() {
       {/* Divider */}
       <div style={{ height: 1, background: C.border, margin: '4px 0 12px' }} />
 
-      {/* Feed Preview */}
+      {/* Feed Preview — linked to live alerts */}
       <div>
         <span style={{ fontFamily: C.mono, fontSize: 9, color: C.orange, letterSpacing: '0.12em', display: 'block', marginBottom: 10 }}>RECENT ACTIVITY</span>
-        {[
-          { msg: 'High-risk loan flagged', time: '0:32', color: C.red },
-          { msg: 'Fraud detected: TXN-8850', time: '1:14', color: C.red },
-          { msg: 'Portfolio rebalanced', time: '2:45', color: C.green },
-          { msg: 'Model retrained OK', time: '4:12', color: C.cyan },
-          { msg: 'Risk threshold updated', time: '6:30', color: C.orange },
-        ].map((item, i) => (
-          <div key={i} style={{
+        {(liveAlerts ?? [
+          { id: 'f1', msg: 'High-risk loan flagged', time: Date.now() - 32000, sev: 'critical' as const, acked: false },
+          { id: 'f2', msg: 'Fraud detected: TXN-8850', time: Date.now() - 74000, sev: 'critical' as const, acked: false },
+          { id: 'f3', msg: 'Portfolio rebalanced', time: Date.now() - 165000, sev: 'info' as const, acked: false },
+          { id: 'f4', msg: 'Model retrained OK', time: Date.now() - 252000, sev: 'info' as const, acked: false },
+          { id: 'f5', msg: 'Risk threshold updated', time: Date.now() - 390000, sev: 'warning' as const, acked: false },
+        ]).slice(0, 6).map((item) => {
+          const sevColor = item.sev === 'critical' ? C.red : item.sev === 'warning' ? C.orange : item.sev === 'info' ? C.cyan : C.green;
+          const age = Date.now() - item.time;
+          const ageStr = age < 60000 ? `${Math.round(age / 1000)}s` : age < 3600000 ? `${Math.round(age / 60000)}m` : `${Math.round(age / 3600000)}h`;
+          return (
+          <div key={item.id} style={{
             display: 'flex',
             gap: 8,
             padding: '5px 0',
             borderBottom: `1px solid ${C.border}`,
+            opacity: item.acked ? 0.4 : 1,
           }}>
-            <div style={{ width: 4, borderRadius: 1, background: item.color, flexShrink: 0, marginTop: 2, height: 14 }} />
+            <div style={{ width: 4, borderRadius: 1, background: sevColor, flexShrink: 0, marginTop: 2, height: 14 }} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontFamily: C.mono, fontSize: 9, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.msg}</div>
-              <div style={{ fontFamily: C.mono, fontSize: 8, color: C.textDim }}>{item.time} ago</div>
+              <div style={{ fontFamily: C.mono, fontSize: 8, color: C.textDim }}>{ageStr} ago</div>
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
 
       <style>{`

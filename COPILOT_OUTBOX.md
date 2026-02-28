@@ -34,6 +34,30 @@ Proposed next action:
 
 ## Live Log
 
+### Cycle Timestamp (UTC): 2026-03-01T18:30:00Z
+Status: DONE
+Packet ID: P-LIVE1
+
+Completed:
+- Created `useLiveData.ts` custom hook: polls `/api/system/status` every 10 s, tracks connection state, 15 s stale threshold
+- TopBar tickers now update with live micro-fluctuations (±0.08 % jitter every 4 s) with delta arrows and per-ticker stale detection
+- Added connection/stale indicator in TopBar (Wifi/WifiOff icon + LIVE/STALE label)
+- Notification dropdown now shows live alert feed, individual ack buttons (Check icon), and "ACK ALL" batch action
+- Sidebar "Active Alerts" stat card count is now driven by live unacked alert count
+- Sidebar "Recent Activity" feed now linked to live alert state with dynamic timestamps and acked-dimming
+- Simulated new alert injection every 25-40 s to demonstrate live feed behavior
+
+Files changed:
+- frontend/src/app/components/fin/useLiveData.ts — NEW: live data polling hook
+- frontend/src/app/App.tsx — wired useLiveData, passes liveData/liveActions to TopBar and liveAlerts to Sidebar
+- frontend/src/app/components/fin/TopBar.tsx — live tickers, stale indicator, ack-able notifications
+- frontend/src/app/components/fin/Sidebar.tsx — live alert count, live activity feed
+
+Commits:
+- P-LIVE1: real-time alerts and market liveness with stale-state handling
+
+---
+
 ### Cycle Timestamp (UTC): 2026-03-01T18:15:00Z
 Status: DONE
 Packet ID: P-UX1

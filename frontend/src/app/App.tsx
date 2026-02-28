@@ -5,6 +5,7 @@ import { RiskScore } from './components/fin/RiskScore';
 import { FraudDetect } from './components/fin/FraudDetect';
 import { Portfolio } from './components/fin/Portfolio';
 import { C } from './components/fin/colors';
+import { useLiveData } from './components/fin/useLiveData';
 
 type Tab = 'RISK_SCORE' | 'FRAUD_DETECT' | 'PORTFOLIO';
 
@@ -22,6 +23,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>('RISK_SCORE');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const isMobile = useIsMobile();
+  const [liveData, liveActions] = useLiveData();
 
   return (
     <div style={{
@@ -35,7 +37,7 @@ export default function App() {
       color: C.text,
     }}>
       {/* Top Bar */}
-      <TopBar activeTab={activeTab} setActiveTab={setActiveTab} onMenuToggle={() => setSidebarOpen(!sidebarOpen)} isMobile={isMobile} />
+      <TopBar activeTab={activeTab} setActiveTab={setActiveTab} onMenuToggle={() => setSidebarOpen(!sidebarOpen)} isMobile={isMobile} liveData={liveData} liveActions={liveActions} />
 
       {/* Body */}
       <div style={{
@@ -45,12 +47,12 @@ export default function App() {
         minHeight: 0,
       }}>
         {/* Sidebar — hidden on mobile via CSS, shown in overlay */}
-        {!isMobile && <Sidebar data-mobile-sidebar />}
+        {!isMobile && <Sidebar liveAlerts={liveData.alerts} />}
         {isMobile && (
           <>
             <div data-mobile-sidebar-overlay className={sidebarOpen ? 'open' : ''} onClick={() => setSidebarOpen(false)} />
             <div data-mobile-sidebar-panel className={sidebarOpen ? 'open' : ''} style={{ background: C.bgPanel }}>
-              <Sidebar />
+              <Sidebar liveAlerts={liveData.alerts} />
             </div>
           </>
         )}
