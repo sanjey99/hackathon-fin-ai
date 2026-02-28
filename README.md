@@ -14,7 +14,8 @@ Finance-track AI system focused on one polished flow:
 ## Why this architecture
 - Node backend for app/orchestration (team-friendly)
 - Python ML service for real deep learning credibility
-- Single monorepo for speed; service split for judge-friendly complexity
+- Postgres service for persistence and future audit logs
+- Dockerized microservice split for judge-friendly complexity + easy teammate setup
 
 ## Folders
 - `frontend/` UI (terminal-style dashboard)
@@ -28,6 +29,17 @@ Finance-track AI system focused on one polished flow:
 2. Backend calls ML service for anomaly/risk score
 3. UI shows confidence + recommendation
 4. Action panel: hedge / hold / rebalance suggestion
+
+## Run with Docker (microservices)
+```bash
+docker compose up --build
+```
+
+Services:
+- Frontend: http://localhost:5173
+- Backend API: http://localhost:4000
+- ML service: http://localhost:8000
+- Postgres: localhost:5432
 
 ## Deadline plan
 - T-18h: working end-to-end flow

@@ -1,11 +1,45 @@
 <!doctype html>
-<html><head><meta charset='UTF-8'/><meta name='viewport' content='width=device-width,initial-scale=1'/><title>FinSentinel</title></head>
-<body style="background:#070b12;color:#eaf1ff;font-family:Inter,Arial,sans-serif;max-width:900px;margin:30px auto;padding:0 16px;">
-<h1>FinSentinel Dashboard (MVP)</h1>
-<p>Professional finance terminal style placeholder. Wire React/Vite here next.</p>
-<ul>
-<li>Upload/simulate portfolio features</li>
-<li>Get risk/anomaly score + confidence</li>
-<li>View recommendation card</li>
-</ul>
-</body></html>
+<html>
+  <head>
+    <meta charset='UTF-8'/>
+    <meta name='viewport' content='width=device-width,initial-scale=1'/>
+    <title>FinSentinel Terminal</title>
+    <style>
+      body{background:#070b12;color:#eaf1ff;font-family:Inter,Arial,sans-serif;max-width:980px;margin:24px auto;padding:0 16px}
+      .card{border:1px solid rgba(255,255,255,.15);border-radius:12px;padding:16px;margin-top:12px;background:#0c1220}
+      input,button{padding:8px 10px;border-radius:8px;border:1px solid #24324a;background:#0f182c;color:#eaf1ff}
+      button{cursor:pointer}
+      pre{white-space:pre-wrap}
+    </style>
+  </head>
+  <body>
+    <h1>FinSentinel — Finance Intelligence Copilot</h1>
+    <p>One-flow demo: features -> AI inference -> confidence + recommendation.</p>
+
+    <div class="card">
+      <label>Input features (comma-separated): </label>
+      <input id="f" value="0.1,0.4,0.2,0.3,0.8,0.2,0.5,0.9" size="50" />
+      <button onclick="runInfer()">Run Inference</button>
+    </div>
+
+    <div class="card">
+      <h3>Output</h3>
+      <pre id="out">(waiting)</pre>
+    </div>
+
+    <script>
+      async function runInfer(){
+        const arr=(document.getElementById('f').value||'').split(',').map(x=>Number(x.trim())).filter(x=>!Number.isNaN(x));
+        const out=document.getElementById('out');
+        out.textContent='running...';
+        try{
+          const r=await fetch('http://localhost:4000/api/infer',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({features:arr})});
+          const d=await r.json();
+          out.textContent=JSON.stringify(d,null,2);
+        }catch(e){
+          out.textContent='error: '+e;
+        }
+      }
+    </script>
+  </body>
+</html>
