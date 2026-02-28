@@ -14,6 +14,7 @@ Then open:
 - Frontend: http://localhost:5173
 - Backend health: http://localhost:4000/health
 - ML health: http://localhost:8000/health
+- WebSocket stream: ws://localhost:4000/ws/signals
 
 ## Test endpoints quickly
 ```bash

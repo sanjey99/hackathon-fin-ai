@@ -1,111 +1,169 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+const WS = (import.meta.env.VITE_WS_URL || 'ws://localhost:4000/ws/signals');
 
 const styles = {
-  body: { background:'#070b12', color:'#eaf1ff', fontFamily:'Inter,Arial,sans-serif', maxWidth:980, margin:'24px auto', padding:'0 16px' },
-  card: { border:'1px solid rgba(255,255,255,.15)', borderRadius:12, padding:16, marginTop:12, background:'#0c1220' },
-  input: { padding:'8px 10px', borderRadius:8, border:'1px solid #24324a', background:'#0f182c', color:'#eaf1ff' },
-  badge: (ok) => ({ display:'inline-block', padding:'4px 8px', borderRadius:999, border:'1px solid '+(ok?'#2f8f62':'#8f3b3b'), background: ok?'#103025':'#2e1818', fontSize:12, marginRight:6 }),
-  grid: { display:'grid', gridTemplateColumns:'repeat(2,minmax(0,1fr))', gap:12 },
-  metric: { border:'1px solid rgba(255,255,255,.12)', borderRadius:10, padding:10, background:'#0f1729' }
+  page:{ background:'#05080f', color:'#d9e5ff', fontFamily:'Inter,Arial,sans-serif', minHeight:'100vh', padding:'12px' },
+  grid:{ display:'grid', gridTemplateColumns:'240px 1fr 360px', gap:10 },
+  panel:{ border:'1px solid #1f2d47', background:'#0b1322', borderRadius:8, padding:10 },
+  title:{ fontSize:12, color:'#8fb7ff', textTransform:'uppercase', letterSpacing:1.2 },
+  table:{ width:'100%', borderCollapse:'collapse', fontSize:13 },
+  td:{ borderBottom:'1px solid #1f2d47', padding:'6px 4px' },
+  badge:(ok)=>({display:'inline-block',padding:'3px 8px',borderRadius:999,border:'1px solid '+(ok?'#2a7c57':'#7c2a2a'),background:ok?'#0e2f22':'#2f1212',fontSize:11,marginRight:6})
 };
 
+function LeftNav(){
+  return (
+    <div style={styles.panel}>
+      <div style={styles.title}>Console</div>
+      <div style={{marginTop:10,lineHeight:1.9}}>
+        <div>Watchlist</div><div>Signals</div><div>Risk</div><div>Alerts</div><div>Scenarios</div><div>Audit</div>
+      </div>
+    </div>
+  );
+}
+
+function MarketTable({markets}){
+  return (
+    <div style={styles.panel}>
+      <div style={styles.title}>Live Market Feed</div>
+      <table style={{...styles.table, marginTop:8}}>
+        <thead><tr><th align='left'>Symbol</th><th align='right'>Price</th><th align='right'>Δ%</th><th align='right'>Volume</th></tr></thead>
+        <tbody>
+          {markets.map(m=>(
+            <tr key={m.symbol}>
+              <td style={styles.td}>{m.symbol}</td>
+              <td style={{...styles.td,textAlign:'right'}}>{m.price}</td>
+              <td style={{...styles.td,textAlign:'right', color:m.changePct>=0?'#79e8a7':'#ff8b8b'}}>{m.changePct}</td>
+              <td style={{...styles.td,textAlign:'right'}}>{m.volume.toLocaleString()}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function RightPanel({ensemble, regime, backendOk, mlOk, wsOk}){
+  return (
+    <div style={styles.panel}>
+      <div style={styles.title}>Model Decision</div>
+      <div style={{marginTop:8}}>
+        <span style={styles.badge(backendOk)}>Backend {backendOk?'OK':'DOWN'}</span>
+        <span style={styles.badge(mlOk)}>ML {mlOk?'OK':'DOWN'}</span>
+        <span style={styles.badge(wsOk)}>WS {wsOk?'OK':'DOWN'}</span>
+      </div>
+      <div style={{marginTop:12,fontSize:14}}>
+        <div><b>Regime:</b> {regime?.regime || '-'}</div>
+        <div><b>Action:</b> {ensemble?.action?.action || '-'}</div>
+        <div><b>Confidence:</b> {ensemble?.action?.confidence ?? '-'}</div>
+        <div><b>Uncertainty:</b> {ensemble?.uncertainty ?? '-'}</div>
+        <div><b>Disagreement:</b> {String(ensemble?.disagreement ?? false)}</div>
+      </div>
+      <div style={{marginTop:12,padding:8,border:'1px solid #1f2d47',borderRadius:6,fontSize:12,color:'#a8c4ff'}}>
+        {ensemble?.summary || 'Awaiting ensemble output...'}
+      </div>
+    </div>
+  );
+}
+
 export default function App(){
-  const [cases,setCases]=useState([]);
-  const [selected,setSelected]=useState('');
-  const [features,setFeatures]=useState('0.1,0.4,0.2,0.3,0.8,0.2,0.5,0.9');
   const [backendOk,setBackendOk]=useState(false);
   const [mlOk,setMlOk]=useState(false);
-  const [raw,setRaw]=useState('(waiting)');
-  const [result,setResult]=useState({});
+  const [wsOk,setWsOk]=useState(false);
+  const [markets,setMarkets]=useState([]);
+  const [regime,setRegime]=useState(null);
+  const [ensemble,setEnsemble]=useState(null);
+  const [features,setFeatures]=useState('0.6,0.7,-0.3,0.5,-0.4,0.9,-0.2,0.1');
+  const [scenario,setScenario]=useState('volatility-spike');
+  const [log,setLog]=useState([]);
 
-  useEffect(()=>{ init(); },[]);
+  useEffect(()=>{ health(); connectWS(); },[]);
 
-  async function init(){ await Promise.all([loadCases(), health()]); }
   async function health(){
-    try { const r = await fetch(`${API}/health`); setBackendOk(r.ok);} catch { setBackendOk(false); }
-    try { const r = await fetch(`${API}/api/model-info`); setMlOk(r.ok);} catch { setMlOk(false); }
+    try{ const r=await fetch(`${API}/health`); setBackendOk(r.ok);}catch{setBackendOk(false)}
+    try{ const r=await fetch(`${API}/api/model-info`); setMlOk(r.ok);}catch{setMlOk(false)}
   }
-  async function loadCases(){
-    try {
-      const r = await fetch(`${API}/api/demo-cases`);
-      const d = await r.json();
-      const arr = d.cases || [];
-      setCases(arr);
-      if (arr.length) setSelected(arr[0].name);
-    } catch {}
+
+  function connectWS(){
+    const ws = new WebSocket(WS);
+    ws.onopen = ()=>setWsOk(true);
+    ws.onclose = ()=>setWsOk(false);
+    ws.onmessage = (ev)=>{
+      const d = JSON.parse(ev.data);
+      if(d.type==='tick'){
+        setMarkets(d.markets || []);
+        setRegime(d.regime || null);
+        setLog((prev)=>[`${new Date().toLocaleTimeString()} tick ${d.regime?.regime || ''}`,...prev].slice(0,12));
+      }
+    };
   }
-  function loadCase(){
-    const c = cases.find(x=>x.name===selected);
-    if (c) setFeatures(c.features.join(','));
-  }
-  async function runInfer(){
+
+  async function runEnsemble(){
     const arr = features.split(',').map(x=>Number(x.trim())).filter(x=>!Number.isNaN(x));
-    setRaw('running /api/infer ...');
-    try{
-      const r = await fetch(`${API}/api/infer`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({features:arr})});
-      const d = await r.json();
-      setRaw(JSON.stringify(d,null,2));
-      if (d.ok) setResult(d);
-    }catch(e){ setRaw('error: '+e); }
+    const r = await fetch(`${API}/api/ensemble`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({features:arr})});
+    const d = await r.json();
+    if(d.ok){
+      setEnsemble(d);
+      setRegime(d.regime);
+      setMarkets(d.markets || markets);
+      setLog((prev)=>[`${new Date().toLocaleTimeString()} ensemble -> ${d.action?.action}`,...prev].slice(0,12));
+    }
   }
-  async function runSim(){
-    setRaw('running /api/simulate ...');
-    try{
-      const r = await fetch(`${API}/api/simulate`);
-      const d = await r.json();
-      setRaw(JSON.stringify(d,null,2));
-      if (d.ok) setResult(d);
-    }catch(e){ setRaw('error: '+e); }
+
+  async function runScenario(){
+    const r = await fetch(`${API}/api/scenario/run`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({scenario})});
+    const d = await r.json();
+    if(d.ok){
+      setRegime(d.regime);
+      setMarkets(d.after || []);
+      setLog((prev)=>[`${new Date().toLocaleTimeString()} scenario ${scenario}`,...prev].slice(0,12));
+    }
   }
+
+  const anomalyRatio = useMemo(()=>{
+    if(!markets.length) return '-';
+    const hi = markets.filter(m=>Math.abs(m.changePct)>1).length;
+    return `${hi}/${markets.length}`;
+  },[markets]);
 
   return (
-    <div style={styles.body}>
-      <h1>FinSentinel — Finance Intelligence Copilot</h1>
-      <p>
-        <span style={styles.badge(true)}>Finance Track</span>
-        <span style={styles.badge(true)}>Deep Learning</span>
-        <span style={styles.badge(true)}>Microservices</span>
-      </p>
+    <div style={styles.page}>
+      <h2 style={{margin:'4px 0 10px'}}>FinSentinel // Bloomberg-style AI Finance Ops Console</h2>
+      <div style={styles.grid}>
+        <div>
+          <LeftNav/>
+          <div style={{...styles.panel, marginTop:10}}>
+            <div style={styles.title}>Actions</div>
+            <div style={{marginTop:8,fontSize:12}}>Features</div>
+            <textarea value={features} onChange={e=>setFeatures(e.target.value)} style={{width:'100%',height:58,background:'#0f182c',color:'#eaf1ff',border:'1px solid #24324a',borderRadius:6}} />
+            <button onClick={runEnsemble} style={{marginTop:8,width:'100%',background:'#0f182c',color:'#eaf1ff',border:'1px solid #24324a',borderRadius:6,padding:8}}>Run Ensemble</button>
+            <div style={{marginTop:8}}>
+              <select value={scenario} onChange={e=>setScenario(e.target.value)} style={{width:'100%',background:'#0f182c',color:'#eaf1ff',border:'1px solid #24324a',borderRadius:6,padding:8}}>
+                <option value='volatility-spike'>Volatility Spike</option>
+                <option value='rate-hike'>Rate Hike</option>
+                <option value='liquidity-crunch'>Liquidity Crunch</option>
+              </select>
+            </div>
+            <button onClick={runScenario} style={{marginTop:8,width:'100%',background:'#0f182c',color:'#eaf1ff',border:'1px solid #24324a',borderRadius:6,padding:8}}>Run Scenario</button>
+          </div>
+        </div>
 
-      <div style={styles.card}>
-        <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
-          <label>Demo case:</label>
-          <select style={styles.input} value={selected} onChange={e=>setSelected(e.target.value)}>
-            {cases.map(c=><option key={c.name} value={c.name}>{c.name}</option>)}
-          </select>
-          <button style={styles.input} onClick={loadCase}>Load Case</button>
+        <div>
+          <MarketTable markets={markets}/>
+          <div style={{...styles.panel, marginTop:10}}>
+            <div style={styles.title}>KPI</div>
+            <div style={{marginTop:8,fontSize:13}}>Anomaly-like moves: <b>{anomalyRatio}</b></div>
+            <div style={{fontSize:13}}>Avg regime score: <b>{regime?.score ?? '-'}</b></div>
+          </div>
+          <div style={{...styles.panel, marginTop:10}}>
+            <div style={styles.title}>Event Feed</div>
+            <div style={{marginTop:8,fontSize:12,lineHeight:1.6}}>{log.map((x,i)=><div key={i}>{x}</div>)}</div>
+          </div>
         </div>
-        <div style={{marginTop:10}}>
-          <label>Input features (comma-separated): </label>
-          <input style={{...styles.input, width:'100%', marginTop:6}} value={features} onChange={e=>setFeatures(e.target.value)} />
-        </div>
-        <div style={{marginTop:10}}>
-          <button style={styles.input} onClick={runInfer}>Run Inference</button>
-          <button style={styles.input} onClick={runSim}>Run Simulated Case</button>
-        </div>
-        <div style={{marginTop:10}}>
-          <span style={styles.badge(backendOk)}>Backend: {backendOk?'OK':'DOWN'}</span>
-          <span style={styles.badge(mlOk)}>ML: {mlOk?'OK':'DOWN'}</span>
-        </div>
-      </div>
 
-      <div style={styles.card}>
-        <h3>Result</h3>
-        <div style={styles.grid}>
-          <div style={styles.metric}><div>Risk Score</div><b>{result.risk_score ?? '-'}</b></div>
-          <div style={styles.metric}><div>Label</div><b>{result.label ?? '-'}</b></div>
-          <div style={styles.metric}><div>Confidence</div><b>{result.confidence ?? '-'}</b></div>
-          <div style={styles.metric}><div>Recommendation</div><b>{result.recommendation ?? '-'}</b></div>
-        </div>
-        <div style={{...styles.metric, marginTop:10}}><div>Decision Reason</div><b>{result.decision_reason ?? '-'}</b></div>
-        <div style={{...styles.metric, marginTop:10}}><div>Timestamp</div><b>{result.timestamp ?? '-'}</b></div>
-      </div>
-
-      <div style={styles.card}>
-        <h3>Raw Output</h3>
-        <pre style={{whiteSpace:'pre-wrap'}}>{raw}</pre>
+        <RightPanel ensemble={ensemble} regime={regime} backendOk={backendOk} mlOk={mlOk} wsOk={wsOk}/>
       </div>
     </div>
   );
