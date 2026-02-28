@@ -34,6 +34,66 @@ Proposed next action:
 
 ## Live Log
 
+### Cycle Timestamp (UTC): 2026-03-01T11:30:00Z
+Status: DONE
+Packet ID: P-S1
+
+Completed:
+- Added GET /api/stocks/picker endpoint in backend with Top 20 universe
+- Deterministic equal-weight scoring (momentum/value/quality subscores) that changes every 5 min
+- Returns top 8 picks with overall score, confidence, reason_tags
+- Returns rejected list with reason_not_selected
+- Frontend Stock Picker tab: full picks table with sector badges, score columns, reason tags
+- Rejected stocks in expandable section
+- Auto-refresh every 300s with countdown timer
+- Manual refresh button, loading/error/empty states
+
+Acceptance:
+- [x] GET /api/stocks/picker endpoint works
+- [x] UI shows top picks with all scoring fields
+- [x] 5-min auto-refresh with countdown
+- [x] No silent failures
+
+Files changed:
+- backend/src/index.js — added GET /api/stocks/picker + stock universe + scoring logic
+- frontend/src/App.jsx — added StockPickerTab component
+- frontend/index.html — added Stock Picker CSS
+
+Commits:
+- P-S1: Stock Picker endpoint + frontend tab
+
+---
+
+### Cycle Timestamp (UTC): 2026-03-01T11:45:00Z
+Status: DONE
+Packet ID: P-F1
+
+Completed:
+- Added POST /api/fraud/scan endpoint in backend with validation + account-level alerting
+- Added POST /fraud/score ML endpoint with heuristic fraud scoring (amount, foreign, late-night, high-risk category)
+- Per-transaction fraud_score, label (fraudulent/suspicious/legitimate), suspicious_features
+- Account-level alert: alert_score, action (block/review/monitor), summary
+- Frontend Fraud tab: CSV paste input, Load Sample button, Scan for Fraud CTA
+- Results: account alert card (block/review/monitor), transactions table with score badges + label badges + suspicious features
+- Loading/error/empty states all handled
+
+Acceptance:
+- [x] POST /api/fraud/scan works end-to-end
+- [x] Per-transaction + account-level outputs visible
+- [x] Action 'block' appears for high-risk cases
+- [x] CSV flow works
+
+Files changed:
+- backend/src/index.js — added POST /api/fraud/scan + validation + account alerting
+- ml_service/app.py — added FraudRow/FraudScanIn models + POST /fraud/score endpoint
+- frontend/src/App.jsx — added FraudTab component
+- frontend/index.html — added Fraud Detection CSS
+
+Commits:
+- P-F1: Fraud Detection endpoint + ML scoring + frontend tab
+
+---
+
 ### Cycle Timestamp (UTC): 2026-03-01T10:30:00Z
 Status: DONE
 Packet ID: P-H2

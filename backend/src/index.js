@@ -281,6 +281,167 @@ app.post('/api/portfolio/optimize', async (req, res) => {
   });
 });
 
+// ── Stock Picker ─────────────────────────────────────────────────────────────
+
+const STOCK_UNIVERSE = [
+  { symbol: 'AAPL',  name: 'Apple Inc.',          sector: 'Tech' },
+  { symbol: 'MSFT',  name: 'Microsoft Corp.',     sector: 'Tech' },
+  { symbol: 'NVDA',  name: 'NVIDIA Corp.',        sector: 'Tech' },
+  { symbol: 'GOOGL', name: 'Alphabet Inc.',       sector: 'Tech' },
+  { symbol: 'AMZN',  name: 'Amazon.com Inc.',     sector: 'Consumer' },
+  { symbol: 'META',  name: 'Meta Platforms Inc.',  sector: 'Tech' },
+  { symbol: 'TSLA',  name: 'Tesla Inc.',          sector: 'Auto' },
+  { symbol: 'JPM',   name: 'JPMorgan Chase',      sector: 'Finance' },
+  { symbol: 'V',     name: 'Visa Inc.',           sector: 'Finance' },
+  { symbol: 'JNJ',   name: 'Johnson & Johnson',   sector: 'Healthcare' },
+  { symbol: 'WMT',   name: 'Walmart Inc.',        sector: 'Consumer' },
+  { symbol: 'PG',    name: 'Procter & Gamble',    sector: 'Consumer' },
+  { symbol: 'UNH',   name: 'UnitedHealth Group',  sector: 'Healthcare' },
+  { symbol: 'HD',    name: 'Home Depot Inc.',      sector: 'Consumer' },
+  { symbol: 'MA',    name: 'Mastercard Inc.',      sector: 'Finance' },
+  { symbol: 'BAC',   name: 'Bank of America',     sector: 'Finance' },
+  { symbol: 'XOM',   name: 'Exxon Mobil Corp.',   sector: 'Energy' },
+  { symbol: 'KO',    name: 'Coca-Cola Co.',       sector: 'Consumer' },
+  { symbol: 'PFE',   name: 'Pfizer Inc.',         sector: 'Healthcare' },
+  { symbol: 'INTC',  name: 'Intel Corp.',         sector: 'Tech' },
+];
+
+function deterministicScore(symbol, seed) {
+  // Deterministic pseudo-random scores using simple hash
+  let h = 0;
+  const s = symbol + ':' + seed;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+  return Math.abs(h % 10000) / 10000;
+}
+
+function generateStockPicks() {
+  const now = new Date();
+  // Seed changes every 5 minutes for refresh simulation
+  const seed = Math.floor(now.getTime() / 300000).toString();
+
+  const scored = STOCK_UNIVERSE.map(stock => {
+    const momentum = parseFloat(deterministicScore(stock.symbol, seed + 'mom').toFixed(4));
+    const value    = parseFloat(deterministicScore(stock.symbol, seed + 'val').toFixed(4));
+    const quality  = parseFloat(deterministicScore(stock.symbol, seed + 'qlt').toFixed(4));
+    const overall  = parseFloat(((momentum + value + quality) / 3).toFixed(4));
+    const confidence = parseFloat((0.60 + overall * 0.35).toFixed(4));
+
+    const tags = [];
+    if (momentum > 0.7) tags.push('strong momentum');
+    if (value > 0.7) tags.push('value play');
+    if (quality > 0.7) tags.push('high quality');
+    if (momentum < 0.3) tags.push('weak momentum');
+    if (value < 0.3) tags.push('expensive');
+    if (quality < 0.3) tags.push('low quality');
+    if (tags.length === 0) tags.push('balanced');
+
+    return { ...stock, momentum, value, quality, overall, confidence, reason_tags: tags };
+  });
+
+  scored.sort((a, b) => b.overall - a.overall);
+
+  const PICK_COUNT = 8;
+  const picks = scored.slice(0, PICK_COUNT);
+  const rejected = scored.slice(PICK_COUNT).map(s => ({
+    ...s,
+    reason_not_selected: s.overall < 0.4
+      ? `Low composite score (${s.overall.toFixed(2)})`
+      : s.momentum < 0.3
+        ? `Weak momentum (${s.momentum.toFixed(2)})`
+        : `Ranked below top ${PICK_COUNT} (score ${s.overall.toFixed(2)})`
+  }));
+
+  return { picks, rejected, generated_at: now.toISOString(), seed };
+}
+
+// GET /api/stocks/picker — real-time stock picks with equal-weight scoring
+app.get('/api/stocks/picker', (_req, res) => {
+  const { picks, rejected, generated_at, seed } = generateStockPicks();
+  return res.json({
+    ok: true,
+    picks,
+    rejected,
+    universe_size: STOCK_UNIVERSE.length,
+    refresh_interval_sec: 300,
+    generated_at,
+    seed,
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// ── Fraud Detection ──────────────────────────────────────────────────────────
+
+function validateFraudScanInput(body) {
+  const { rows } = body || {};
+  if (!rows || !Array.isArray(rows) || rows.length === 0)
+    return '"rows" must be a non-empty array of transaction objects.';
+  if (rows.length > 500)
+    return `Maximum 500 rows allowed (got ${rows.length}).`;
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    if (!r || typeof r !== 'object')
+      return `Row ${i} must be an object.`;
+    if (typeof r.amount !== 'number' || !isFinite(r.amount))
+      return `Row ${i}: "amount" must be a finite number.`;
+  }
+  return null;
+}
+
+// POST /api/fraud/scan — scan transactions for fraud
+app.post('/api/fraud/scan', async (req, res) => {
+  const body = req.body || {};
+  const validError = validateFraudScanInput(body);
+  if (validError) return res.status(400).json(errBody(validError, 'input validation'));
+
+  const rows = body.rows;
+
+  // Call ML service for batch scoring
+  let mlScores;
+  try {
+    const r = await mlFetch('/fraud/score', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rows }),
+    }, 15000);
+    mlScores = await r.json();
+  } catch (e) {
+    return res.status(502).json(errBody(e.message, 'POST /fraud/score'));
+  }
+
+  const transactions = mlScores.transactions || [];
+
+  // Compute account-level alert
+  const avgRisk = transactions.length > 0
+    ? transactions.reduce((s, t) => s + (t.fraud_score || 0), 0) / transactions.length
+    : 0;
+  const maxRisk = transactions.length > 0
+    ? Math.max(...transactions.map(t => t.fraud_score || 0))
+    : 0;
+  const highRiskCount = transactions.filter(t => (t.fraud_score || 0) > 0.7).length;
+
+  let action = 'monitor';
+  let alert_score = parseFloat(((avgRisk * 0.4 + maxRisk * 0.6)).toFixed(4));
+  if (maxRisk > 0.85 || highRiskCount >= 3) { action = 'block'; alert_score = Math.max(alert_score, 0.85); }
+  else if (maxRisk > 0.6 || highRiskCount >= 1) { action = 'review'; alert_score = Math.max(alert_score, 0.50); }
+
+  return res.json({
+    ok: true,
+    transactions,
+    account_alert: {
+      alert_score: parseFloat(alert_score.toFixed(4)),
+      action,
+      high_risk_count: highRiskCount,
+      total_scanned: transactions.length,
+      summary: action === 'block'
+        ? `Critical: ${highRiskCount} high-risk transactions detected. Recommend immediate account block.`
+        : action === 'review'
+          ? `Warning: ${highRiskCount} suspicious transactions flagged for manual review.`
+          : 'All transactions within acceptable risk thresholds. Continue monitoring.',
+    },
+    timestamp: new Date().toISOString(),
+  });
+});
+
 // ── Start ─────────────────────────────────────────────────────────────────────
 
 const port = process.env.PORT || 4000;

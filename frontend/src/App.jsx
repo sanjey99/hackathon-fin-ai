@@ -654,12 +654,338 @@ function RiskScoreTab() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// ─── STOCK PICKER TAB ───────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function StockPickerTab() {
+  const [data, setData] = React.useState(null);
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState(null);
+  const [lastRefresh, setLastRefresh] = React.useState(null);
+  const [countdown, setCountdown] = React.useState(300);
+
+  async function fetchPicks() {
+    setLoading(true); setError(null);
+    try {
+      const r = await fetch(`${API}/api/stocks/picker?universe=top20&refresh=5m`);
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || `HTTP ${r.status}`);
+      setData(d);
+      setLastRefresh(new Date());
+      setCountdown(300);
+    } catch (e) {
+      setError(String(e.message || e));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Auto-fetch on mount
+  React.useEffect(() => { fetchPicks(); }, []);
+
+  // Auto-refresh every 300s
+  React.useEffect(() => {
+    const interval = setInterval(() => {
+      setCountdown(prev => {
+        if (prev <= 1) { fetchPicks(); return 300; }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const picks = data?.picks || [];
+  const rejected = data?.rejected || [];
+
+  if (loading && !data) {
+    return (
+      <div className="sp-layout">
+        <div className="pf-loading">
+          <div className="pf-spinner" />
+          <span>Loading stock picks…</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="sp-layout">
+      <div className="sp-header">
+        <div>
+          <div className="section-heading" style={{marginBottom: '2px'}}>Stock Picker — Top 20 Universe</div>
+          <span className="sp-meta">
+            {lastRefresh ? `Last refresh: ${lastRefresh.toLocaleTimeString()}` : ''} · Next in {Math.floor(countdown / 60)}:{String(countdown % 60).padStart(2, '0')}
+          </span>
+        </div>
+        <button className="btn-primary btn-sm" onClick={fetchPicks} disabled={loading}>
+          {loading ? '↻ Refreshing…' : '↻ Refresh Now'}
+        </button>
+      </div>
+
+      {error && <div className="err-banner">{error}</div>}
+
+      {!data && !error && (
+        <div className="pf-empty-state">
+          <div className="pf-empty-icon">📈</div>
+          <div className="pf-empty-title">No Data</div>
+          <div className="pf-empty-sub">Click Refresh to load stock picks.</div>
+        </div>
+      )}
+
+      {data && (
+        <React.Fragment>
+          {/* ── Top Picks ── */}
+          <div className="section-heading" style={{marginTop:'16px'}}>Top Picks</div>
+          <table className="market-table sp-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Symbol</th>
+                <th>Name</th>
+                <th>Sector</th>
+                <th style={{textAlign:'right'}}>Momentum</th>
+                <th style={{textAlign:'right'}}>Value</th>
+                <th style={{textAlign:'right'}}>Quality</th>
+                <th style={{textAlign:'right'}}>Overall</th>
+                <th style={{textAlign:'right'}}>Confidence</th>
+                <th>Tags</th>
+              </tr>
+            </thead>
+            <tbody>
+              {picks.map((s, i) => (
+                <tr key={s.symbol}>
+                  <td className="idx">{i + 1}</td>
+                  <td className="name">{s.symbol}</td>
+                  <td className="desc">{s.name}</td>
+                  <td><span className="sp-sector-badge">{s.sector}</span></td>
+                  <td style={{textAlign:'right'}} className={s.momentum > 0.6 ? 'green-text' : s.momentum < 0.3 ? 'red-text' : ''}>{(s.momentum * 100).toFixed(1)}</td>
+                  <td style={{textAlign:'right'}} className={s.value > 0.6 ? 'green-text' : s.value < 0.3 ? 'red-text' : ''}>{(s.value * 100).toFixed(1)}</td>
+                  <td style={{textAlign:'right'}} className={s.quality > 0.6 ? 'green-text' : s.quality < 0.3 ? 'red-text' : ''}>{(s.quality * 100).toFixed(1)}</td>
+                  <td style={{textAlign:'right', fontWeight: 700}} className={s.overall > 0.6 ? 'green-text' : s.overall < 0.4 ? 'red-text' : ''}>{(s.overall * 100).toFixed(1)}</td>
+                  <td style={{textAlign:'right'}}>{(s.confidence * 100).toFixed(0)}%</td>
+                  <td>
+                    <div className="sp-tags">
+                      {s.reason_tags.map((t, j) => <span key={j} className={cls('sp-tag', t.includes('strong') || t.includes('high') || t.includes('value play') ? 'positive' : t.includes('weak') || t.includes('low') || t.includes('expensive') ? 'negative' : '')}>{t}</span>)}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {/* ── Rejected ── */}
+          <details className="advanced" style={{marginTop:'24px'}}>
+            <summary style={{fontSize:'12px'}}>Rejected Stocks ({rejected.length})</summary>
+            <table className="market-table sp-table" style={{marginTop:'8px'}}>
+              <thead>
+                <tr>
+                  <th>Symbol</th>
+                  <th>Name</th>
+                  <th style={{textAlign:'right'}}>Overall</th>
+                  <th>Reason</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rejected.map(s => (
+                  <tr key={s.symbol} className="sp-rejected-row">
+                    <td className="name" style={{opacity:0.6}}>{s.symbol}</td>
+                    <td className="desc" style={{opacity:0.6}}>{s.name}</td>
+                    <td style={{textAlign:'right', opacity:0.6}}>{(s.overall * 100).toFixed(1)}</td>
+                    <td><span className="sp-reject-reason">{s.reason_not_selected}</span></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </details>
+        </React.Fragment>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ─── FRAUD DETECTION TAB ────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const SAMPLE_CSV = `amount,merchant,category,hour,is_foreign
+150.00,Amazon,retail,14,false
+8500.00,Unknown Merchant,wire_transfer,3,true
+45.00,Starbucks,food,9,false
+3200.00,CryptoExchange,crypto,2,true
+75.00,Netflix,subscription,20,false
+12000.00,Offshore LLC,cash_advance,1,true
+250.00,Walmart,retail,15,false
+6000.00,Casino Royal,gambling,23,false`;
+
+function FraudTab() {
+  const [csvText, setCsvText] = React.useState('');
+  const [result, setResult] = React.useState(null);
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState(null);
+
+  function parseCSVToRows(text) {
+    const lines = text.trim().split('\n').filter(Boolean);
+    if (lines.length < 2) return [];
+    const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+    return lines.slice(1).map(line => {
+      const vals = line.split(',').map(v => v.trim());
+      const obj = {};
+      headers.forEach((h, i) => { obj[h] = vals[i] || ''; });
+      return {
+        amount: parseFloat(obj.amount) || 0,
+        merchant: obj.merchant || '',
+        category: obj.category || '',
+        hour: parseInt(obj.hour, 10) || 12,
+        is_foreign: obj.is_foreign === 'true' || obj.is_foreign === '1',
+      };
+    });
+  }
+
+  async function runScan() {
+    setLoading(true); setError(null); setResult(null);
+    const rows = parseCSVToRows(csvText);
+    if (rows.length === 0) {
+      setError('No valid rows found. Paste CSV with headers: amount,merchant,category,hour,is_foreign');
+      setLoading(false);
+      return;
+    }
+    try {
+      const r = await fetch(`${API}/api/fraud/scan`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rows }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || d.message || `HTTP ${r.status}`);
+      setResult(d);
+    } catch (e) {
+      setError(String(e.message || e));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function loadSample() {
+    setCsvText(SAMPLE_CSV);
+  }
+
+  const alert = result?.account_alert;
+  const txns = result?.transactions || [];
+
+  return (
+    <div className="fd-layout">
+      {/* ── Left: Input ── */}
+      <div className="fd-col-left">
+        <div className="section-heading">Transaction Input (CSV)</div>
+        <p className="hint">Paste CSV with headers: amount, merchant, category, hour, is_foreign</p>
+        <textarea
+          className="pf-csv-input fd-csv-input"
+          rows={10}
+          placeholder={SAMPLE_CSV}
+          value={csvText}
+          onChange={e => setCsvText(e.target.value)}
+        />
+        <div className="fd-btn-row">
+          <button className="btn-secondary btn-sm" onClick={loadSample}>Load Sample</button>
+          <button className="btn-primary fd-scan-btn" onClick={runScan} disabled={loading || !csvText.trim()}>
+            {loading ? '⏳ Scanning…' : '🔍 Scan for Fraud'}
+          </button>
+        </div>
+      </div>
+
+      {/* ── Right: Results ── */}
+      <div className="fd-col-right">
+        {loading && (
+          <div className="pf-loading">
+            <div className="pf-spinner" />
+            <span>Scanning transactions…</span>
+          </div>
+        )}
+
+        {error && <div className="err-banner">{error}</div>}
+
+        {!result && !loading && !error && (
+          <div className="pf-empty-state">
+            <div className="pf-empty-icon">🛡</div>
+            <div className="pf-empty-title">No Scan Results</div>
+            <div className="pf-empty-sub">Paste transaction CSV and click <strong>Scan for Fraud</strong> to analyze transactions for suspicious activity.</div>
+          </div>
+        )}
+
+        {result && (
+          <React.Fragment>
+            {/* ── Account Alert ── */}
+            <div className="section-heading">Account Alert</div>
+            <div className={cls('fd-alert-card', alert?.action === 'block' ? 'fd-block' : alert?.action === 'review' ? 'fd-review' : 'fd-monitor')}>
+              <div className="fd-alert-action">
+                {alert?.action === 'block' ? '🚫 BLOCK' : alert?.action === 'review' ? '⚠ REVIEW' : '✓ MONITOR'}
+              </div>
+              <div className="fd-alert-score">Alert Score: {(alert?.alert_score * 100).toFixed(1)}%</div>
+              <div className="fd-alert-summary">{alert?.summary}</div>
+              <div className="fd-alert-meta">{alert?.high_risk_count} high-risk · {alert?.total_scanned} scanned</div>
+            </div>
+
+            {/* ── Transactions Table ── */}
+            <div className="section-heading" style={{marginTop:'20px'}}>Transaction Results</div>
+            <table className="market-table fd-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Merchant</th>
+                  <th>Category</th>
+                  <th style={{textAlign:'right'}}>Amount</th>
+                  <th style={{textAlign:'right'}}>Fraud Score</th>
+                  <th>Label</th>
+                  <th>Suspicious Features</th>
+                </tr>
+              </thead>
+              <tbody>
+                {txns.map((t, i) => (
+                  <tr key={i} className={t.label === 'fraudulent' ? 'fd-row-fraud' : t.label === 'suspicious' ? 'fd-row-suspicious' : ''}>
+                    <td className="idx">{i + 1}</td>
+                    <td className="name">{t.merchant}</td>
+                    <td>{t.category}</td>
+                    <td style={{textAlign:'right', fontVariantNumeric:'tabular-nums'}}>${t.amount.toLocaleString(undefined, {minimumFractionDigits:2})}</td>
+                    <td style={{textAlign:'right'}}>
+                      <span className={cls('fd-score-badge', t.fraud_score > 0.65 ? 'high' : t.fraud_score > 0.4 ? 'mid' : 'low')}>
+                        {(t.fraud_score * 100).toFixed(1)}%
+                      </span>
+                    </td>
+                    <td>
+                      <span className={cls('fd-label-badge', t.label === 'fraudulent' ? 'fraud' : t.label === 'suspicious' ? 'sus' : 'legit')}>
+                        {t.label}
+                      </span>
+                    </td>
+                    <td>
+                      <div className="sp-tags">
+                        {t.suspicious_features.map((f, j) => <span key={j} className="sp-tag negative">{f}</span>)}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            <details className="advanced" style={{marginTop:'16px'}}>
+              <summary>Raw Response</summary>
+              <pre className="adv-pre">{JSON.stringify(result, null, 2)}</pre>
+            </details>
+          </React.Fragment>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // ─── ROOT APP WITH TABS ─────────────────────────────────────────────────────
 // ═══════════════════════════════════════════════════════════════════════════════
 
 const TABS = [
   { id: 'portfolio', label: 'Portfolio', icon: '📊' },
-  { id: 'risk',      label: 'Risk Score', icon: '🛡' },
+  { id: 'stocks',    label: 'Stock Picker', icon: '📈' },
+  { id: 'fraud',     label: 'Fraud Detect', icon: '🛡' },
+  { id: 'risk',      label: 'Risk Score', icon: '⚡' },
 ];
 
 function App() {
@@ -674,7 +1000,13 @@ function App() {
       <TabBar tabs={TABS} active={activeTab} onChange={setActiveTab} beOk={beOk} mlOk={mlOk} />
       <div className="tab-content">
         {activeTab === 'portfolio' && <PortfolioTab />}
+        {activeTab === 'stocks' && <StockPickerTab />}
+        {activeTab === 'fraud' && <FraudTab />}
         {activeTab === 'risk' && <RiskScoreTab />}
+      </div>
+      <div className="app-footer">
+        <span>Hackathon build – deploy ready</span>
+        <span>API: {API}</span>
       </div>
     </div>
   );

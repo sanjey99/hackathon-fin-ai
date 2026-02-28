@@ -212,6 +212,74 @@
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: #1e2e47; border-radius: 3px; }
     ::-webkit-scrollbar-thumb:hover { background: #2a4060; }
+
+    /* ═══════════════════════════════════════════════════════════════════════════
+       STOCK PICKER TAB
+       ═══════════════════════════════════════════════════════════════════════ */
+
+    .sp-layout { padding: 20px 28px; height: 100%; overflow-y: auto; }
+    .sp-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+    .sp-meta { font-size: 11px; color: #3d5070; }
+    .sp-table { font-size: 12px; }
+    .sp-table th { font-size: 9px; white-space: nowrap; }
+    .sp-table td { padding: 7px 8px; }
+    .sp-sector-badge { font-size: 10px; font-weight: 600; background: #162033; border: 1px solid #253351; color: #7a9abf; border-radius: 4px; padding: 2px 7px; }
+    .green-text { color: #4ade80; }
+    .red-text { color: #f87171; }
+
+    .sp-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+    .sp-tag { font-size: 10px; font-weight: 500; padding: 2px 7px; border-radius: 4px; background: #162033; color: #7a9abf; border: 1px solid #253351; white-space: nowrap; }
+    .sp-tag.positive { background: #052e16; color: #4ade80; border-color: #14532d; }
+    .sp-tag.negative { background: #2a0a0a; color: #f87171; border-color: #7f1d1d; }
+
+    .sp-rejected-row td { opacity: 0.6; }
+    .sp-reject-reason { font-size: 11px; color: #5a7298; font-style: italic; }
+
+    /* ═══════════════════════════════════════════════════════════════════════════
+       FRAUD DETECTION TAB
+       ═══════════════════════════════════════════════════════════════════════ */
+
+    .fd-layout { display: grid; grid-template-columns: 340px 1fr; gap: 0; height: 100%; overflow: hidden; }
+    .fd-col-left { background: #0a0f1c; border-right: 1px solid #182035; padding: 20px 18px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+    .fd-col-right { background: #070b12; padding: 24px 28px; overflow-y: auto; }
+    .fd-csv-input { min-height: 180px; font-size: 11px; }
+    .fd-btn-row { display: flex; flex-direction: column; gap: 8px; }
+    .fd-scan-btn { width: 100%; padding: 12px; font-size: 13px; border-radius: 10px; }
+
+    /* Alert card */
+    .fd-alert-card { border-radius: 10px; padding: 16px 18px; margin-top: 4px; margin-bottom: 8px; }
+    .fd-alert-card.fd-block   { background: #1a0505; border: 1px solid #7f1d1d; }
+    .fd-alert-card.fd-review  { background: #1a1505; border: 1px solid #78350f; }
+    .fd-alert-card.fd-monitor { background: #09120d; border: 1px solid #14532d; }
+    .fd-alert-action { font-size: 18px; font-weight: 700; margin-bottom: 6px; }
+    .fd-alert-card.fd-block .fd-alert-action   { color: #f87171; }
+    .fd-alert-card.fd-review .fd-alert-action  { color: #fbbf24; }
+    .fd-alert-card.fd-monitor .fd-alert-action { color: #4ade80; }
+    .fd-alert-score { font-size: 13px; font-weight: 600; color: #dce8ff; margin-bottom: 6px; }
+    .fd-alert-summary { font-size: 13px; color: #7a9abf; line-height: 1.5; margin-bottom: 4px; }
+    .fd-alert-meta { font-size: 11px; color: #4a6080; }
+
+    /* Transaction table */
+    .fd-table { font-size: 12px; }
+    .fd-table th { font-size: 9px; }
+    .fd-row-fraud td { background: #12090c !important; }
+    .fd-row-suspicious td { background: #120f05 !important; }
+
+    .fd-score-badge { font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 4px; }
+    .fd-score-badge.high { background: #2a0a0a; color: #f87171; }
+    .fd-score-badge.mid  { background: #1a1505; color: #fbbf24; }
+    .fd-score-badge.low  { background: #052e16; color: #4ade80; }
+
+    .fd-label-badge { font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 4px; text-transform: uppercase; letter-spacing: .5px; }
+    .fd-label-badge.fraud { background: #2a0a0a; color: #f87171; border: 1px solid #7f1d1d; }
+    .fd-label-badge.sus   { background: #1a1505; color: #fbbf24; border: 1px solid #78350f; }
+    .fd-label-badge.legit { background: #052e16; color: #4ade80; border: 1px solid #14532d; }
+
+    /* ═══════════════════════════════════════════════════════════════════════════
+       APP FOOTER
+       ═══════════════════════════════════════════════════════════════════════ */
+
+    .app-footer { display: flex; align-items: center; justify-content: space-between; padding: 0 18px; height: 28px; background: #0a0f1c; border-top: 1px solid #182035; font-size: 10px; color: #3d5070; flex-shrink: 0; }
   </style>
 </head>
 <body>
