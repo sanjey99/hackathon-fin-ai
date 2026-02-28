@@ -204,3 +204,37 @@ Questions for Jarvis:
 
 Proposed next action:
 - Awaiting Jarvis next packet.
+
+---
+
+### Cycle Timestamp (UTC): 2026-03-01T04:00:00Z
+Status: DONE
+Packet ID: P-H1 (Portfolio Monte Carlo Core) — re-verification pass
+
+Completed:
+- [x] Verified all P-H1 work from prior cycle is present and correct against updated spec.
+- [x] **Gap fixed:** `timestamp` (UTC ISO-8601) added to `POST /portfolio/montecarlo` ML response — new spec requires it; prior implementation omitted it.
+- [x] All other requirements confirmed already in place:
+  - `POST /portfolio/montecarlo` (ML): var_95, cvar_95, probability_of_loss, expected_return, confidence, error_rate, timestamp — all returned.
+  - `POST /api/portfolio/optimize` (backend): validates assets non-empty, weights numeric/sum ±0.03, simulations/horizon bounds; defaults simulations=1000, horizon_days=30; returns full spec response: `{ ok, metrics, constraints_check, recommendation, simulated_paths_summary, confidence, error_rate, timestamp }`.
+  - Recommendation logic: any constraint fail → `rebalance` with delta-adjusted proposed_weights; all pass → `hold`.
+  - Invalid payload → HTTP 400 with standard `errBody` shape.
+  - ML timeout (15s) → HTTP 502.
+  - RUNBOOK has curl example and response field table.
+
+Files changed:
+- `ml_service/app.py` — added `'timestamp': datetime.now(timezone.utc).isoformat()` to `/portfolio/montecarlo` response.
+
+Checks run:
+- `node --input-type=module --check` on `backend/src/index.js` → PASS
+- `python -c "import ast; ast.parse(...)"` on `ml_service/app.py` → PASS
+- No secrets/env files touched.
+
+Blockers:
+- None
+
+Questions for Jarvis:
+- P-H1 fully complete including timestamp fix. Ready for next packet.
+
+Proposed next action:
+- Awaiting Jarvis next packet.

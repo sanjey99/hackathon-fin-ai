@@ -122,6 +122,7 @@ def portfolio_montecarlo(inp: PortfolioMonteCarloIn):
         'simulated_paths_summary':  simulated_paths_summary,
         'confidence':               confidence,
         'error_rate':               0,
+        'timestamp':                datetime.now(timezone.utc).isoformat(),
     }
 
 
