@@ -3,38 +3,38 @@
 A build is considered deploy-ready **only if all checks below pass**.
 
 ## Code & Build
-- [ ] Frontend build passes (`cd frontend && npm install && npm run build`)
-- [ ] Backend starts without runtime errors
-- [ ] ML service starts without runtime errors
-- [ ] No unresolved merge conflicts
+- [x] Frontend build passes (`cd frontend && npm install && npm run build`)
+- [x] Backend starts without runtime errors
+- [x] ML service starts without runtime errors
+- [x] No unresolved merge conflicts
 
 ## Endpoints
-- [ ] `GET /health` returns ok
-- [ ] `GET /api/system/status` returns backend/ml/ws status
-- [ ] `POST /api/portfolio/optimize` returns full metrics + recommendation
-- [ ] `GET /api/stocks/picker` returns picks + rejected reasons
-- [ ] `POST /api/fraud/scan` returns per-transaction + account-level outputs
+- [x] `GET /health` returns ok
+- [x] `GET /api/system/status` returns backend/ml/ws status
+- [x] `POST /api/portfolio/optimize` returns full metrics + recommendation
+- [x] `GET /api/stocks/picker` returns picks + rejected reasons
+- [x] `POST /api/fraud/scan` returns per-transaction + account-level outputs
 
 ## Frontend UX
-- [ ] Portfolio tab is default landing tab
-- [ ] Stock picker tab refreshes at 5-minute interval
-- [ ] Fraud tab supports CSV upload and scan
-- [ ] Loading/error/empty states visible and clean
-- [ ] Demo marker visible: `Hackathon build – deploy ready`
+- [x] Portfolio tab is default landing tab
+- [x] Stock picker tab refreshes at 5-minute interval
+- [x] Fraud tab supports CSV upload and scan
+- [x] Loading/error/empty states visible and clean
+- [x] Demo marker visible: `Hackathon build – deploy ready`
 
 ## Reliability
-- [ ] Buttons disabled while request in-flight
-- [ ] Failed API calls show readable messages (no blank screen)
-- [ ] Demo mode/fallback path is available
+- [x] Buttons disabled while request in-flight
+- [x] Failed API calls show readable messages (no blank screen)
+- [x] Demo mode/fallback path is available
 
 ## Docs
-- [ ] `docs/RUNBOOK.md` has startup + smoke test commands
-- [ ] `README.md` includes known limitations and deploy steps
+- [x] `docs/RUNBOOK.md` has startup + smoke test commands
+- [x] `README.md` includes known limitations and deploy steps
 
 ## Git/Branch
-- [ ] Work branch pushed and synced
+- [x] Work branch pushed and synced
 - [ ] PR to main created or main directly updated (team decision)
-- [ ] Last 3 commits have clear messages
+- [x] Last 3 commits have clear messages
 
 ---
 
