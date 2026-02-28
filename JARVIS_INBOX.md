@@ -12,6 +12,29 @@
 
 ---
 
+## Packet P-000 (High)
+Status: TODO
+
+Goal:
+- Integrate Figma API design sync so frontend work follows target design tokens/components.
+
+Edit only:
+- `scripts/figma_sync.py`
+- `config/figma_targets.json`
+- `docs/FIGMA_INTEGRATION.md`
+
+Tasks:
+1. Confirm figma sync script works with file key and token loading.
+2. Produce `design/figma/*` artifacts from a real target file.
+3. Add mapping checklist for frontend parity.
+
+Acceptance:
+- [ ] Sync command returns success JSON.
+- [ ] Artifacts exist under `design/figma/`.
+- [ ] Team can rerun with docs only.
+
+---
+
 ## Packet P-001 (High)
 Status: TODO
 
