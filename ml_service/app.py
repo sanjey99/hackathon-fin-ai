@@ -4,6 +4,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from pathlib import Path
+from datetime import datetime, timezone
 
 app = FastAPI(title='FinSentinel ML Service')
 
@@ -27,9 +28,20 @@ if MODEL_PATH.exists():
     model.load_state_dict(torch.load(MODEL_PATH, map_location='cpu'))
 model.eval()
 
+THRESHOLD = 0.65
+
 @app.get('/health')
 def health():
     return {'ok': True, 'service': 'ml'}
+
+@app.get('/model/info')
+def model_info():
+    return {
+        'model_type': 'TinyMLP',
+        'input_dim': 8,
+        'threshold': THRESHOLD,
+        'model_loaded': MODEL_PATH.exists()
+    }
 
 @app.get('/simulate')
 def simulate():
@@ -40,7 +52,7 @@ def simulate():
     return {
         'features': sample.tolist(),
         'risk_score': round(score, 4),
-        'label': 'anomaly' if score > 0.65 else 'normal'
+        'label': 'anomaly' if score > THRESHOLD else 'normal'
     }
 
 
@@ -52,12 +64,18 @@ def infer(inp: InferIn):
     x = torch.tensor(arr).unsqueeze(0)
     with torch.no_grad():
         score = float(model(x).item())
-    label = 'anomaly' if score > 0.65 else 'normal'
+    label = 'anomaly' if score > THRESHOLD else 'normal'
     confidence = round(max(score, 1-score), 4)
     recommendation = 'reduce risk / hedge' if label == 'anomaly' else 'hold / monitor'
+    if label == 'anomaly':
+        decision_reason = f'Risk score {round(score,4)} exceeds threshold {THRESHOLD}; anomalous feature pattern detected.'
+    else:
+        decision_reason = f'Risk score {round(score,4)} is below threshold {THRESHOLD}; feature pattern within normal bounds.'
     return {
         'risk_score': round(score, 4),
         'label': label,
         'confidence': confidence,
-        'recommendation': recommendation
+        'recommendation': recommendation,
+        'decision_reason': decision_reason,
+        'timestamp': datetime.now(timezone.utc).isoformat()
     }
