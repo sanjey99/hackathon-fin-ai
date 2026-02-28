@@ -40,3 +40,10 @@ cd backend
 npm install
 ML_URL=http://localhost:8000 npm run dev
 ```
+
+### Start frontend (Vite)
+```bash
+cd frontend
+npm install
+VITE_API_URL=http://localhost:4000 npm run dev
+```

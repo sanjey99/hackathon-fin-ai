@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 
-const API = process.env.REACT_APP_API_URL || 'http://localhost:4000';
+const API = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 
 const styles = {
   body: { background:'#070b12', color:'#eaf1ff', fontFamily:'Inter,Arial,sans-serif', maxWidth:980, margin:'24px auto', padding:'0 16px' },
@@ -22,9 +22,7 @@ export default function App(){
 
   useEffect(()=>{ init(); },[]);
 
-  async function init(){
-    await Promise.all([loadCases(), health()]);
-  }
+  async function init(){ await Promise.all([loadCases(), health()]); }
   async function health(){
     try { const r = await fetch(`${API}/health`); setBackendOk(r.ok);} catch { setBackendOk(false); }
     try { const r = await fetch(`${API}/api/model-info`); setMlOk(r.ok);} catch { setMlOk(false); }
