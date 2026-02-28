@@ -14,45 +14,16 @@ Then open:
 - Frontend: http://localhost:5173
 - Backend health: http://localhost:4000/health
 - ML health: http://localhost:8000/health
+- WebSocket stream: ws://localhost:4000/ws/signals
 
-## Test inference quickly
+## Test endpoints quickly
 ```bash
+curl -s http://localhost:4000/api/demo-cases
+curl -s http://localhost:4000/api/model-info
+curl -s http://localhost:4000/api/simulate
 curl -s -X POST http://localhost:4000/api/infer \
   -H 'Content-Type: application/json' \
   -d '{"features":[0.1,0.4,0.2,0.3,0.8,0.2,0.5,0.9]}'
-```
-
-## New endpoints (P-001)
-
-### List demo cases
-```bash
-curl -s http://localhost:4000/api/demo-cases | python3 -m json.tool
-```
-
-### ML model info
-```bash
-curl -s http://localhost:8000/model/info | python3 -m json.tool
-```
-
-### Validate bad infer payload (expect HTTP 400)
-```bash
-curl -s -o /dev/null -w '%{http_code}' -X POST http://localhost:4000/api/infer \
-  -H 'Content-Type: application/json' \
-  -d '{"features":"not-an-array"}'
-# Should return: 400
-
-curl -s -X POST http://localhost:4000/api/infer \
-  -H 'Content-Type: application/json' \
-  -d '{"features":[]}'
-# Should return: {"ok":false,"error":"\"features\" length must be between 1 and 64 (got 0)."}
-```
-
-### Infer response now includes timestamp + decision_reason
-```bash
-curl -s -X POST http://localhost:4000/api/infer \
-  -H 'Content-Type: application/json' \
-  -d '{"features":[0.95,0.72,-0.18,0.41,0.07,1.01,0.15,0.32]}' | python3 -m json.tool
-# Response includes: risk_score, label, confidence, recommendation, decision_reason, timestamp
 ```
 
 ## Fallback (no Docker)
@@ -71,139 +42,83 @@ npm install
 ML_URL=http://localhost:8000 npm run dev
 ```
 
-## P-003 — Backend reliability hardening
-
-### Standard error shape
-All error responses now follow this contract:
-```json
-{ "ok": false, "error": "<human-readable string>", "context": "<endpoint hint>", "ts": "<ISO-8601 UTC>" }
-```
-- Validation failures → **HTTP 400**
-- ML upstream failures (timeout / unreachable) → **HTTP 502**
-
-### System status check
+### Start frontend (Vite)
 ```bash
-curl -s http://localhost:4000/api/system/status | python3 -m json.tool
-# Expected:
-# {
-#   "ok": true,
-#   "backend_ok": true,
-#   "ml_ok": true,
-#   "ws_enabled": false,
-#   "timestamp": "2026-...",
-#   "notes": "<present only when ML is down>"
-# }
+cd frontend
+npm install
+VITE_API_URL=http://localhost:4000 npm run dev
 ```
 
-### Model info via backend proxy
+---
+
+## Frontend Deploy Smoke Checks
+
+### Pre-deploy Checklist
 ```bash
-curl -s http://localhost:4000/api/model-info | python3 -m json.tool
-# Returns: model_type, input_dim, threshold, model_loaded
+# 1. Build succeeds without errors
+cd frontend && npm run build
+
+# 2. Verify dist output exists
+ls dist/index.html dist/assets/
+
+# 3. Check no TypeScript errors
+npx tsc --noEmit
+
+# 4. Preview production build locally
+npx vite preview --port 5173
 ```
 
-### Ensemble endpoint (runs all 3 demo cases)
+### UX Behavior Verification
+
+#### Loading States
+- **Risk Score tab**: Click "RUN MODEL" → button shows spinner + "PROCESSING..." text → button is disabled during execution → output panel shows animated inference steps
+- **Portfolio tab**: Click "OPTIMIZE" → button shows spinner + "OPTIMIZING..." text → button is disabled during execution
+- **All tabs**: No blank/white screens at any point; idle state shows instruction card
+
+#### Error States
+- **API unreachable**: Footer health indicator turns red; error cards appear with descriptive messages
+- **Risk model failure**: Error card appears in both input and output panels with message
+- **Portfolio optimization failure**: Error card appears below OPTIMIZE button
+
+#### Empty / Idle States
+- **Risk Score (first visit)**: Shows orange instruction card: "READY TO START — Configure loan parameters below and click RUN MODEL"
+- **Risk Output panel (idle)**: Shows "NO DATA YET" placeholder with instructions
+- **Portfolio (first visit)**: Shows instruction hint below OPTIMIZE button
+
+#### Demo Mode
+- **Toggle location**: Top-right corner of the app, labeled "DEMO MODE" with an on/off switch
+- **When ON**: All API calls route to `/api/simulate` for safe, deterministic output; orange "DEMO MODE ACTIVE" indicator visible in footer; terminal prompt shows `--mode=demo`
+- **When OFF**: Normal ensemble/inference flow is used; standard API calls
+- **Toggle is persistent**: Stays active across tab switches within the same session
+
+#### Footer Panel
+- Always visible at bottom of screen (32px height)
+- Shows: API base URL, health status indicator (green/yellow/red), last updated timestamp
+- Deploy-ready marker: Green badge reading "FRONTEND DEPLOY-READY"
+
+### Quick Smoke Test Script
 ```bash
-curl -s -X POST http://localhost:4000/api/ensemble \
-  -H 'Content-Type: application/json' \
-  -d '{}' | python3 -m json.tool
-# Returns: { ok, results: [{name, risk_score, label, ...}, ...], ts }
+# Start all services
+docker compose up --build -d
 
-# Or override with custom features:
-curl -s -X POST http://localhost:4000/api/ensemble \
-  -H 'Content-Type: application/json' \
-  -d '{"features":[0.9,0.8,0.7,0.6,0.5,0.4,0.3,0.2]}' | python3 -m json.tool
-```
+# Wait for startup
+sleep 10
 
-### Quick failure tests
+# 1. Verify frontend loads
+curl -s http://localhost:5173 | grep -q "FinSentinel" && echo "✅ Frontend HTML loads" || echo "❌ Frontend failed"
 
-**Bad payload → 400 with standard error shape:**
-```bash
-curl -s -X POST http://localhost:4000/api/infer \
-  -H 'Content-Type: application/json' \
-  -d '{"features":"not-an-array"}' | python3 -m json.tool
-# { "ok": false, "error": "...", "context": "input validation", "ts": "..." }
+# 2. Verify backend health
+curl -sf http://localhost:4000/health && echo "✅ Backend healthy" || echo "❌ Backend unhealthy"
 
-curl -s -X POST http://localhost:4000/api/infer \
-  -H 'Content-Type: application/json' \
-  -d '{}' | python3 -m json.tool
-# { "ok": false, "error": "\"features\" field is required.", "context": "input validation", "ts": "..." }
-```
+# 3. Verify ML health
+curl -sf http://localhost:8000/health && echo "✅ ML healthy" || echo "❌ ML unhealthy"
 
-**ML timeout simulation (stop ML service, then call infer):**
-```bash
-# After stopping ML service:
-curl -s -X POST http://localhost:4000/api/infer \
-  -H 'Content-Type: application/json' \
-  -d '{"features":[0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8]}'
-# Returns HTTP 502: { "ok": false, "error": "ML service timed out after 8000ms (/infer)", ... }
-```
+# 4. Verify simulate endpoint (used by demo mode)
+curl -sf http://localhost:4000/api/simulate && echo "✅ Simulate endpoint OK" || echo "❌ Simulate failed"
 
-**System status when ML is down:**
-```bash
-curl -s http://localhost:4000/api/system/status | python3 -m json.tool
-# ml_ok will be false, notes will explain why
-```
-
-## P-H1 — Portfolio Monte Carlo Optimisation
-
-### Endpoint
-`POST /api/portfolio/optimize`
-
-### Example request
-```bash
-curl -s -X POST http://localhost:4000/api/portfolio/optimize \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "mode": "manual",
-    "assets": [
-      {"symbol":"AAPL","weight":0.25},
-      {"symbol":"MSFT","weight":0.25},
-      {"symbol":"NVDA","weight":0.25},
-      {"symbol":"SPY", "weight":0.25}
-    ],
-    "constraints": {
-      "max_drawdown": 0.2,
-      "max_concentration": 0.35,
-      "min_liquidity": 0.2,
-      "target_return": 0.08
-    },
-    "simulations": 1000,
-    "horizon_days": 30
-  }' | python3 -m json.tool
-```
-
-### Response fields
-| Field | Description |
-|---|---|
-| `ok` | `true` on success |
-| `metrics.var_95` | 5th-percentile horizon return (VaR-95), negative = loss |
-| `metrics.cvar_95` | Conditional VaR (expected loss beyond VaR-95) |
-| `metrics.probability_of_loss` | Fraction of simulated paths ending below starting value |
-| `metrics.expected_return` | Mean horizon return across all simulated paths |
-| `constraints_check.*_pass` | Boolean per constraint: `max_drawdown`, `max_concentration`, `min_liquidity`, `target_return` |
-| `recommendation.action` | `hold` or `rebalance` |
-| `recommendation.summary` | Human-readable rationale |
-| `recommendation.proposed_weights` | `[{symbol, weight}]` — adjusted if rebalance |
-| `simulated_paths_summary` | `{min_final, p25_final, median_final, p75_final, max_final, simulations, horizon_days}` |
-| `confidence` | Model confidence [0.5, 0.99] |
-| `error_rate` | 0 unless partial failure |
-| `timestamp` | UTC ISO-8601 |
-
-### Validation rules
-- `assets` — non-empty array; each item needs `symbol` (string) and `weight` (number ≥ 0)
-- weights must sum to 1.0 (±0.03 tolerance)
-- `simulations` — default 1000, max 100000
-- `horizon_days` — default 30, max 365
-
-### Bad-input test (expect HTTP 400)
-```bash
-curl -s -X POST http://localhost:4000/api/portfolio/optimize \
-  -H 'Content-Type: application/json' \
-  -d '{"assets":[]}'
-# { "ok": false, "error": "\"assets\" must be a non-empty array.", ... }
-
-curl -s -X POST http://localhost:4000/api/portfolio/optimize \
-  -H 'Content-Type: application/json' \
-  -d '{"assets":[{"symbol":"AAPL","weight":0.6},{"symbol":"MSFT","weight":0.6}]}'
-# { "ok": false, "error": "Asset weights must sum to 1.0 (±0.03), got 1.2000.", ... }
+# 5. Open browser and check:
+#    - No blank screens
+#    - Footer shows "FRONTEND DEPLOY-READY"
+#    - Demo Mode toggle visible top-right
+#    - Each tab renders without errors
 ```
