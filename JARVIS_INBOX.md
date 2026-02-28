@@ -1,132 +1,112 @@
 # JARVIS_INBOX.md
 
-> Copilot worker must read this file first at the start of every cycle.
-> After completing a packet (or getting blocked), update `COPILOT_OUTBOX.md`.
+> Copilot worker reads this file first each cycle.
+> Execute packets in order unless blocked.
 
 ## Global rules
-- Work branch: `autopilot/night-20260228`
-- Allowed paths: `backend/`, `frontend/`, `ml_service/`, `docs/`, `data/`
-- Do NOT edit secrets/env/auth files
-- Do NOT force-push `main`
-- Commit every 30-60 mins with clear message
+- Branch: `autopilot/night-20260228`
+- Allowed paths: `frontend/`, `backend/`, `ml_service/`, `docs/`, `data/`
+- Do NOT edit secrets/auth configs
+- Do NOT force push
+- Commit and push after each packet
 
 ---
 
-## Packet P-000 (High)
+## Packet P-S1 (High)
 Status: TODO
 
 Goal:
-- Integrate Figma API design sync so frontend work follows target design tokens/components.
+- Implement Real-time Stock Picker analysis (Top 20 universe, 5-min refresh, equal-weight scoring).
 
 Edit only:
-- `scripts/figma_sync.py`
-- `config/figma_targets.json`
-- `docs/FIGMA_INTEGRATION.md`
+- `backend/src/index.js`
+- `frontend/src/App.jsx` (or stock picker components)
+- `docs/RUNBOOK.md`
 
 Tasks:
-1. Confirm figma sync script works with file key and token loading.
-2. Produce `design/figma/*` artifacts from a real target file.
-3. Add mapping checklist for frontend parity.
+1. Add endpoint `GET /api/stocks/picker?universe=top20&refresh=5m`.
+2. Return top picks with momentum/value/quality subscores, overall score, confidence, reason tags.
+3. Return rejected list with `reason_not_selected`.
+4. Frontend Stock Picker tab: top picks table, confidence + reason tags, rejected section.
+5. Add auto-refresh every 300s while tab active + manual refresh button.
 
 Acceptance:
-- [ ] Sync command returns success JSON.
-- [ ] Artifacts exist under `design/figma/`.
-- [ ] Team can rerun with docs only.
+- [ ] Endpoint and UI both work.
+- [ ] 5-min refresh works.
+- [ ] No silent failures.
 
 ---
 
-## Packet P-001 (High)
+## Packet P-F1 (High)
 Status: TODO
 
 Goal:
-- Complete robust API flow for demo reliability.
+- Implement Credit Card Fraud Detection from CSV upload.
 
 Edit only:
 - `backend/src/index.js`
 - `ml_service/app.py`
+- `frontend/src/App.jsx` (or fraud components)
 - `docs/RUNBOOK.md`
 
 Tasks:
-1. Backend: add `GET /api/demo-cases` with 3 named vectors.
-2. Backend: validate `POST /api/infer` input (`features` numeric array, length 1..64).
-3. ML service: add `GET /model/info` with `{model_type,input_dim,threshold,model_loaded}`.
-4. ML service: `/infer` must include `timestamp` and `decision_reason`.
-5. Update runbook with curl commands for new endpoints.
+1. Add `POST /api/fraud/scan` (rows payload).
+2. Add ML endpoint `POST /fraud/score`.
+3. Return per-transaction fraud risk + top suspicious features.
+4. Return account-level alert score + action (`block|review|monitor`).
+5. Frontend Fraud tab: CSV upload, scan button, suspicious tx table, account alert card.
 
 Acceptance:
-- [ ] `/api/demo-cases` returns valid JSON list.
-- [ ] bad infer payload returns HTTP 400 with readable error.
-- [ ] `/model/info` works.
-- [ ] `/api/infer` response includes `decision_reason` + `timestamp`.
-
-If blocked:
-- write blocker + context in `COPILOT_OUTBOX.md` and stop.
+- [ ] CSV flow works end-to-end.
+- [ ] Per-transaction + account-level outputs visible.
+- [ ] Action `block` appears for high-risk cases.
 
 ---
 
-## Packet P-002 (High)
+## Packet P-Q1 (Medium)
 Status: TODO
 
 Goal:
-- Upgrade frontend from raw output to polished demo cards.
+- Reliability pass across all 3 modules.
 
 Edit only:
-- `frontend/index.html`
-
-Tasks:
-1. Add demo-case dropdown fed by `/api/demo-cases`.
-2. Add status indicators for backend + ML health.
-3. Render output as cards:
-   - Risk Score
-   - Label
-   - Confidence
-   - Recommendation
-   - Decision Reason
-4. Keep dark finance-terminal style.
-
-Acceptance:
-- [ ] One-click simulate works from UI.
-- [ ] No manual JSON editing required.
-- [ ] Output cards display all fields.
-
----
-
-## Packet P-003 (Medium)
-Status: TODO
-
-Goal:
-- Add simple persistence for audit trail.
-
-Edit only:
+- `frontend/src/App.jsx` and related frontend components
 - `backend/src/index.js`
 - `docs/RUNBOOK.md`
 
 Tasks:
-1. Add optional `POST /api/audit` to insert inference record into Postgres.
-2. Add `GET /api/audit/recent?limit=20`.
-3. If DB unavailable, fail gracefully with clear message.
+1. Add loading/error/empty states across tabs.
+2. Disable action buttons during in-flight requests.
+3. Add unified error banner.
+4. Add `GET /api/system/status` if missing.
+5. Update RUNBOOK smoke tests.
 
 Acceptance:
-- [ ] API doesn't crash if DB is down.
-- [ ] recent endpoint returns array format.
+- [ ] No blank screens.
+- [ ] Clear status visibility and graceful failures.
 
 ---
 
-## Packet P-004 (Medium)
+## Packet P-D1 (Medium)
 Status: TODO
 
 Goal:
-- Demo hardening + one-command verification.
+- Deploy-ready polish.
 
 Edit only:
+- `frontend/*`
 - `docs/RUNBOOK.md`
 - `README.md`
 
 Tasks:
-1. Add "5-minute judge demo" script section.
-2. Add troubleshooting matrix (CORS, ML not ready, bad payload).
-3. Add command checklist for pre-demo validation.
+1. Ensure frontend build passes.
+2. API base URL env handling documented.
+3. Add demo checklist in RUNBOOK.
+4. Add known limitations section in README.
+5. Add footer marker text: `Hackathon build – deploy ready`.
+6. Final outbox line must include `READY_FOR_DEPLOY=true` or blocker details.
 
 Acceptance:
-- [ ] Team member can run from scratch via docs.
-
+- [ ] Build passes.
+- [ ] Docs are enough for teammate setup.
+- [ ] Deploy marker visible.
