@@ -15,8 +15,11 @@ Then open:
 - Backend health: http://localhost:4000/health
 - ML health: http://localhost:8000/health
 
-## Test inference quickly
+## Test endpoints quickly
 ```bash
+curl -s http://localhost:4000/api/demo-cases
+curl -s http://localhost:4000/api/model-info
+curl -s http://localhost:4000/api/simulate
 curl -s -X POST http://localhost:4000/api/infer \
   -H 'Content-Type: application/json' \
   -d '{"features":[0.1,0.4,0.2,0.3,0.8,0.2,0.5,0.9]}'
