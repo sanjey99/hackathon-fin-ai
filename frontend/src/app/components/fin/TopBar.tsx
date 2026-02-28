@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Bell, User, ChevronDown, Wifi } from 'lucide-react';
+import { Bell, User, ChevronDown, Wifi, Menu } from 'lucide-react';
 import { C } from './colors';
 
 type Tab = 'RISK_SCORE' | 'FRAUD_DETECT' | 'PORTFOLIO';
@@ -7,6 +7,8 @@ type Tab = 'RISK_SCORE' | 'FRAUD_DETECT' | 'PORTFOLIO';
 interface TopBarProps {
   activeTab: Tab;
   setActiveTab: (tab: Tab) => void;
+  onMenuToggle?: () => void;
+  isMobile?: boolean;
 }
 
 const TABS: { id: Tab; label: string }[] = [
@@ -15,7 +17,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'PORTFOLIO', label: 'PORTFOLIO' },
 ];
 
-export function TopBar({ activeTab, setActiveTab }: TopBarProps) {
+export function TopBar({ activeTab, setActiveTab, onMenuToggle, isMobile }: TopBarProps) {
   const [time, setTime] = useState(new Date());
   const [alertPulse, setAlertPulse] = useState(false);
 
@@ -37,7 +39,7 @@ export function TopBar({ activeTab, setActiveTab }: TopBarProps) {
   const isMarketOpen = time.getHours() >= 9 && time.getHours() < 16 && time.getDay() > 0 && time.getDay() < 6;
 
   return (
-    <header style={{
+    <header data-topbar style={{
       height: 48,
       background: C.bgPanel,
       borderBottom: `1px solid ${C.border}`,
@@ -48,9 +50,30 @@ export function TopBar({ activeTab, setActiveTab }: TopBarProps) {
       flexShrink: 0,
       position: 'relative',
       zIndex: 100,
+      overflow: 'hidden',
+      maxWidth: '100vw',
     }}>
+      {/* Mobile menu button */}
+      {isMobile && (
+        <button
+          data-mobile-sidebar-toggle
+          onClick={onMenuToggle}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: C.textDim,
+            cursor: 'pointer',
+            padding: 4,
+            marginRight: 8,
+            display: 'flex',
+            alignItems: 'center',
+          }}
+        >
+          <Menu size={18} />
+        </button>
+      )}
       {/* Brand */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginRight: 24, flexShrink: 0 }}>
+      <div data-topbar-brand style={{ display: 'flex', alignItems: 'center', gap: 8, marginRight: 24, flexShrink: 0 }}>
         <span style={{
           fontFamily: C.mono,
           fontSize: 18,
@@ -69,10 +92,10 @@ export function TopBar({ activeTab, setActiveTab }: TopBarProps) {
       </div>
 
       {/* Separator */}
-      <div style={{ width: 1, height: 24, background: C.border, marginRight: 24 }} />
+      <div data-topbar-sep style={{ width: 1, height: 24, background: C.border, marginRight: 24 }} />
 
       {/* Clock + Market Status */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginRight: 28, flexShrink: 0 }}>
+      <div data-topbar-clock style={{ display: 'flex', alignItems: 'center', gap: 12, marginRight: 28, flexShrink: 0 }}>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
           <span style={{ fontFamily: C.mono, fontSize: 13, color: C.text, letterSpacing: '0.08em', lineHeight: 1.2 }}>{timeStr}</span>
           <span style={{ fontFamily: C.mono, fontSize: 9, color: C.textDim, letterSpacing: '0.06em', lineHeight: 1.2 }}>{dateStr}</span>
@@ -92,7 +115,7 @@ export function TopBar({ activeTab, setActiveTab }: TopBarProps) {
       </div>
 
       {/* Separator */}
-      <div style={{ width: 1, height: 24, background: C.border, marginRight: 4 }} />
+      <div data-topbar-sep style={{ width: 1, height: 24, background: C.border, marginRight: 4 }} />
 
       {/* Tab Navigation */}
       <nav style={{ display: 'flex', alignItems: 'center', flex: 1, gap: 0 }}>
@@ -136,7 +159,7 @@ export function TopBar({ activeTab, setActiveTab }: TopBarProps) {
       </nav>
 
       {/* Market Tickers */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginRight: 20 }}>
+      <div data-topbar-tickers style={{ display: 'flex', alignItems: 'center', gap: 16, marginRight: 20 }}>
         {[
           { sym: 'S&P', val: '5,248.32', chg: '+0.84%', up: true },
           { sym: 'NDX', val: '18,342.1', chg: '+1.22%', up: true },
@@ -153,10 +176,10 @@ export function TopBar({ activeTab, setActiveTab }: TopBarProps) {
       </div>
 
       {/* Separator */}
-      <div style={{ width: 1, height: 24, background: C.border, marginRight: 16 }} />
+      <div data-topbar-sep style={{ width: 1, height: 24, background: C.border, marginRight: 16 }} />
 
       {/* Right Side */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexShrink: 0 }}>
+      <div data-topbar-right style={{ display: 'flex', alignItems: 'center', gap: 16, flexShrink: 0 }}>
         <div style={{ position: 'relative', cursor: 'pointer' }}>
           <Bell size={16} color={C.textDim} />
           <div style={{

@@ -188,7 +188,7 @@ export function Portfolio() {
   };
 
   return (
-    <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
+    <div data-portfolio-layout style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
 
       {/* LEFT: Portfolio Input 280px */}
       <div style={{

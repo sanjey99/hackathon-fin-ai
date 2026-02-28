@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { TopBar } from './components/fin/TopBar';
 import { Sidebar } from './components/fin/Sidebar';
 import { RiskScore } from './components/fin/RiskScore';
@@ -8,8 +8,20 @@ import { C } from './components/fin/colors';
 
 type Tab = 'RISK_SCORE' | 'FRAUD_DETECT' | 'PORTFOLIO';
 
+function useIsMobile(breakpoint = 768) {
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= breakpoint);
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth <= breakpoint);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, [breakpoint]);
+  return isMobile;
+}
+
 export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>('RISK_SCORE');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const isMobile = useIsMobile();
 
   return (
     <div style={{
@@ -23,7 +35,7 @@ export default function App() {
       color: C.text,
     }}>
       {/* Top Bar */}
-      <TopBar activeTab={activeTab} setActiveTab={setActiveTab} />
+      <TopBar activeTab={activeTab} setActiveTab={setActiveTab} onMenuToggle={() => setSidebarOpen(!sidebarOpen)} isMobile={isMobile} />
 
       {/* Body */}
       <div style={{
@@ -32,8 +44,16 @@ export default function App() {
         overflow: 'hidden',
         minHeight: 0,
       }}>
-        {/* Sidebar */}
-        <Sidebar />
+        {/* Sidebar — hidden on mobile via CSS, shown in overlay */}
+        {!isMobile && <Sidebar data-mobile-sidebar />}
+        {isMobile && (
+          <>
+            <div data-mobile-sidebar-overlay className={sidebarOpen ? 'open' : ''} onClick={() => setSidebarOpen(false)} />
+            <div data-mobile-sidebar-panel className={sidebarOpen ? 'open' : ''} style={{ background: C.bgPanel }}>
+              <Sidebar />
+            </div>
+          </>
+        )}
 
         {/* Main Content */}
         <main style={{

@@ -106,7 +106,7 @@ export function FraudDetect() {
   };
 
   return (
-    <div style={{ display: 'flex', height: '100%', overflow: 'hidden', position: 'relative' }}>
+    <div data-fraud-layout style={{ display: 'flex', height: '100%', overflow: 'hidden', position: 'relative' }}>
 
       {/* Main Table Area */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -119,6 +119,7 @@ export function FraudDetect() {
           gap: 16,
           background: C.bgPanel,
           flexShrink: 0,
+          flexWrap: 'wrap',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <div style={{ width: 3, height: 14, background: C.red }} />
@@ -160,7 +161,7 @@ export function FraudDetect() {
         </div>
 
         {/* Table */}
-        <div style={{ flex: 1, overflowY: 'auto' }}>
+        <div data-fraud-table-wrap style={{ flex: 1, overflowY: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
               <tr style={{ background: C.bgPanel, borderBottom: `1px solid ${C.border}` }}>
@@ -264,7 +265,7 @@ export function FraudDetect() {
       </div>
 
       {/* Detail Drawer */}
-      <div style={{
+      <div data-fraud-drawer style={{
         width: drawerOpen && selected ? 360 : 0,
         transition: 'width 0.25s ease',
         overflow: 'hidden',

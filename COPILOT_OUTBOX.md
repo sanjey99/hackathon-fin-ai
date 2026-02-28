@@ -34,6 +34,38 @@ Proposed next action:
 
 ## Live Log
 
+### Cycle Timestamp (UTC): 2026-03-01T18:00:00Z
+Status: DONE
+Packet ID: M-CRIT1
+
+Completed:
+- Created mobile.css with responsive breakpoints: 768px (tablet), 430px (phone), 360px (ultra-narrow)
+- All multi-column layouts (RiskScore, Portfolio, FraudDetect) stack to single-column on ≤768px
+- Sidebar hidden on mobile; replaced with hamburger menu + slide-out overlay
+- TopBar compresses: tickers and clock hidden on tablet, user profile hidden on phone
+- Added data attributes to all layout components for CSS-only responsive targeting
+- Fraud table wraps in horizontal scroll container on narrow screens
+- All buttons enforce 40px minimum touch target on ≤430px
+- Input font-size set to 16px on mobile to prevent iOS auto-zoom
+- No horizontal overflow (`overflow-x: hidden` on html/body)
+- Added Mobile QA section to RUNBOOK with device matrix, checklist, and testing commands
+- Imported mobile.css into styles/index.css
+
+Files changed:
+- frontend/src/styles/mobile.css — new responsive stylesheet
+- frontend/src/styles/index.css — added mobile.css import
+- frontend/src/app/App.tsx — mobile sidebar overlay, useIsMobile hook, menu toggle
+- frontend/src/app/components/fin/TopBar.tsx — hamburger menu button, data attributes for responsive hiding
+- frontend/src/app/components/fin/RiskScore.tsx — data-risk-layout attribute
+- frontend/src/app/components/fin/Portfolio.tsx — data-portfolio-layout attribute
+- frontend/src/app/components/fin/FraudDetect.tsx — data-fraud-layout, data-fraud-drawer, data-fraud-table-wrap
+- docs/RUNBOOK.md — Mobile QA section
+
+Commits:
+- M-CRIT1: critical mobile-first responsiveness and usability fix across all modules
+
+---
+
 ### Cycle Timestamp (UTC): 2026-03-01T12:30:00Z
 Status: DONE
 Packet ID: P-R1

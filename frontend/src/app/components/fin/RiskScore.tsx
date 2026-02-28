@@ -228,7 +228,7 @@ export function RiskScore() {
   const scoreColor = getScoreColor(output.score);
 
   return (
-    <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
+    <div data-risk-layout style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
 
       {/* LEFT: Input Panel 60% */}
       <div style={{
