@@ -23,15 +23,15 @@ function errBody(error, context = undefined) {
  * fetch() wrapper with AbortController timeout.
  * Throws a descriptive Error on timeout or network failure.
  */
-async function mlFetch(path, opts = {}) {
+async function mlFetch(path, opts = {}, timeoutMs = ML_TIMEOUT_MS) {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), ML_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const res = await fetch(`${ML_URL}${path}`, { ...opts, signal: controller.signal });
     return res;
   } catch (e) {
     if (e.name === 'AbortError') {
-      throw new Error(`ML service timed out after ${ML_TIMEOUT_MS}ms (${path})`);
+      throw new Error(`ML service timed out after ${timeoutMs}ms (${path})`);  
     }
     throw new Error(`ML service unreachable: ${e.message}`);
   } finally {
@@ -173,6 +173,112 @@ app.post('/api/ensemble', async (req, res) => {
   } catch (e) {
     return res.status(502).json(errBody(e.message, 'POST /ensemble'));
   }
+});
+
+// ── Portfolio helpers ────────────────────────────────────────────────────────
+
+function validatePortfolioInput(body) {
+  const { assets, simulations, horizon_days } = body || {};
+  if (!assets || !Array.isArray(assets) || assets.length === 0)
+    return '"assets" must be a non-empty array.';
+  for (const a of assets) {
+    if (!a.symbol || typeof a.symbol !== 'string')
+      return 'Each asset must have a "symbol" string.';
+    if (typeof a.weight !== 'number' || !isFinite(a.weight) || a.weight < 0)
+      return `Asset "${a.symbol}" weight must be a non-negative finite number.`;
+  }
+  const weightSum = assets.reduce((s, a) => s + a.weight, 0);
+  if (Math.abs(weightSum - 1.0) > 0.03)
+    return `Asset weights must sum to 1.0 (±0.03), got ${weightSum.toFixed(4)}.`;
+  if (simulations !== undefined && (!Number.isInteger(simulations) || simulations < 1 || simulations > 100000))
+    return '"simulations" must be a positive integer ≤ 100000.';
+  if (horizon_days !== undefined && (!Number.isInteger(horizon_days) || horizon_days < 1 || horizon_days > 365))
+    return '"horizon_days" must be a positive integer ≤ 365.';
+  return null;
+}
+
+function checkConstraints(assets, constraints, metrics) {
+  const c = constraints || {};
+  const maxW = Math.max(...assets.map(a => a.weight));
+  const minW = Math.min(...assets.map(a => a.weight));
+  return {
+    max_drawdown_pass:      c.max_drawdown      != null ? Math.abs(metrics.var_95) <= c.max_drawdown      : true,
+    max_concentration_pass: c.max_concentration != null ? maxW <= c.max_concentration                      : true,
+    min_liquidity_pass:     c.min_liquidity     != null ? minW >= c.min_liquidity                          : true,
+    target_return_pass:     c.target_return     != null ? metrics.expected_return >= c.target_return       : true,
+  };
+}
+
+function buildRecommendation(assets, constraintsCheck) {
+  const anyFail = Object.values(constraintsCheck).some(v => v === false);
+  if (!anyFail) {
+    return {
+      action: 'hold',
+      summary: 'All constraints satisfied. Current allocation is within acceptable risk parameters.',
+      proposed_weights: assets.map(a => ({ symbol: a.symbol, weight: a.weight })),
+    };
+  }
+  const weights = assets.map(a => a.weight);
+  const maxIdx  = weights.indexOf(Math.max(...weights));
+  const minIdx  = weights.indexOf(Math.min(...weights));
+  const delta   = parseFloat(Math.min(0.05, (weights[maxIdx] - weights[minIdx]) / 2).toFixed(4));
+  const proposed = weights.map((w, i) => {
+    if (i === maxIdx) return parseFloat((w - delta).toFixed(4));
+    if (i === minIdx) return parseFloat((w + delta).toFixed(4));
+    return w;
+  });
+  const failed = Object.entries(constraintsCheck)
+    .filter(([, v]) => !v)
+    .map(([k]) => k.replace(/_pass$/, '').replace(/_/g, ' '));
+  return {
+    action: 'rebalance',
+    summary: `Constraints violated: ${failed.join(', ')}. Reduce ${assets[maxIdx].symbol} and increase ${assets[minIdx].symbol} allocation.`,
+    proposed_weights: assets.map((a, i) => ({ symbol: a.symbol, weight: proposed[i] })),
+  };
+}
+
+// POST /api/portfolio/optimize — Monte Carlo portfolio risk & recommendation
+app.post('/api/portfolio/optimize', async (req, res) => {
+  const body = req.body || {};
+  const validError = validatePortfolioInput(body);
+  if (validError) return res.status(400).json(errBody(validError, 'input validation'));
+
+  const assets      = body.assets;
+  const constraints = body.constraints || {};
+  const simulations  = body.simulations  ?? 1000;
+  const horizon_days = body.horizon_days ?? 30;
+
+  let mcResult;
+  try {
+    const r = await mlFetch('/portfolio/montecarlo', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ assets, simulations, horizon_days, constraints }),
+    }, 15000);
+    mcResult = await r.json();
+  } catch (e) {
+    return res.status(502).json(errBody(e.message, 'POST /portfolio/montecarlo'));
+  }
+
+  const metrics = {
+    var_95:              mcResult.var_95,
+    cvar_95:             mcResult.cvar_95,
+    probability_of_loss: mcResult.probability_of_loss,
+    expected_return:     mcResult.expected_return,
+  };
+  const constraintsCheck = checkConstraints(assets, constraints, metrics);
+  const recommendation   = buildRecommendation(assets, constraintsCheck);
+
+  return res.json({
+    ok: true,
+    metrics,
+    constraints_check:         constraintsCheck,
+    recommendation,
+    simulated_paths_summary:   mcResult.simulated_paths_summary,
+    confidence:                mcResult.confidence,
+    error_rate:                mcResult.error_rate,
+    timestamp:                 new Date().toISOString(),
+  });
 });
 
 // ── Start ─────────────────────────────────────────────────────────────────────

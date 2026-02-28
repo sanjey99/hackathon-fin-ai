@@ -143,3 +143,67 @@ curl -s -X POST http://localhost:4000/api/infer \
 curl -s http://localhost:4000/api/system/status | python3 -m json.tool
 # ml_ok will be false, notes will explain why
 ```
+
+## P-H1 — Portfolio Monte Carlo Optimisation
+
+### Endpoint
+`POST /api/portfolio/optimize`
+
+### Example request
+```bash
+curl -s -X POST http://localhost:4000/api/portfolio/optimize \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "mode": "manual",
+    "assets": [
+      {"symbol":"AAPL","weight":0.25},
+      {"symbol":"MSFT","weight":0.25},
+      {"symbol":"NVDA","weight":0.25},
+      {"symbol":"SPY", "weight":0.25}
+    ],
+    "constraints": {
+      "max_drawdown": 0.2,
+      "max_concentration": 0.35,
+      "min_liquidity": 0.2,
+      "target_return": 0.08
+    },
+    "simulations": 1000,
+    "horizon_days": 30
+  }' | python3 -m json.tool
+```
+
+### Response fields
+| Field | Description |
+|---|---|
+| `ok` | `true` on success |
+| `metrics.var_95` | 5th-percentile horizon return (VaR-95), negative = loss |
+| `metrics.cvar_95` | Conditional VaR (expected loss beyond VaR-95) |
+| `metrics.probability_of_loss` | Fraction of simulated paths ending below starting value |
+| `metrics.expected_return` | Mean horizon return across all simulated paths |
+| `constraints_check.*_pass` | Boolean per constraint: `max_drawdown`, `max_concentration`, `min_liquidity`, `target_return` |
+| `recommendation.action` | `hold` or `rebalance` |
+| `recommendation.summary` | Human-readable rationale |
+| `recommendation.proposed_weights` | `[{symbol, weight}]` — adjusted if rebalance |
+| `simulated_paths_summary` | `{min_final, p25_final, median_final, p75_final, max_final, simulations, horizon_days}` |
+| `confidence` | Model confidence [0.5, 0.99] |
+| `error_rate` | 0 unless partial failure |
+| `timestamp` | UTC ISO-8601 |
+
+### Validation rules
+- `assets` — non-empty array; each item needs `symbol` (string) and `weight` (number ≥ 0)
+- weights must sum to 1.0 (±0.03 tolerance)
+- `simulations` — default 1000, max 100000
+- `horizon_days` — default 30, max 365
+
+### Bad-input test (expect HTTP 400)
+```bash
+curl -s -X POST http://localhost:4000/api/portfolio/optimize \
+  -H 'Content-Type: application/json' \
+  -d '{"assets":[]}'
+# { "ok": false, "error": "\"assets\" must be a non-empty array.", ... }
+
+curl -s -X POST http://localhost:4000/api/portfolio/optimize \
+  -H 'Content-Type: application/json' \
+  -d '{"assets":[{"symbol":"AAPL","weight":0.6},{"symbol":"MSFT","weight":0.6}]}'
+# { "ok": false, "error": "Asset weights must sum to 1.0 (±0.03), got 1.2000.", ... }
+```

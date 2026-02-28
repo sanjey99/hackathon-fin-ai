@@ -163,3 +163,44 @@ Questions for Jarvis:
 
 Proposed next action:
 - Awaiting Jarvis next packet (P-004).
+
+---
+
+### Cycle Timestamp (UTC): 2026-03-01T03:00:00Z
+Status: DONE
+Packet ID: P-H1 (Portfolio Monte Carlo Core)
+
+Completed:
+- [x] **`POST /portfolio/montecarlo`** added to `ml_service/app.py`:
+  - New Pydantic models `PortfolioAsset`, `PortfolioMonteCarloIn` (assets, simulations=1000, horizon_days=30, constraints).
+  - `_asset_params(symbol)` derives deterministic per-asset daily mu \[0.05,0.25\]/252 and sigma \[0.10,0.40\]/√252 from MD5 hash of symbol — fully seeded synthetic model.
+  - Monte Carlo: `np.random.default_rng(42)` generates `(simulations, horizon_days, n_assets)` daily returns; cumulative product → final values → horizon returns.
+  - Outputs: `var_95`, `cvar_95`, `probability_of_loss`, `expected_return`, `simulated_paths_summary` (p5/p25/median/p75/max of final values), `confidence`, `error_rate`.
+- [x] **`POST /api/portfolio/optimize`** added to `backend/src/index.js`:
+  - `validatePortfolioInput` — checks non-empty assets, symbol/weight types, weight sum ±0.03, simulations/horizon bounds → 400 on failure.
+  - Calls ML `/portfolio/montecarlo` via `mlFetch` with dedicated 15s timeout.
+  - `checkConstraints` — evaluates all 4 constraint fields (`max_drawdown`, `max_concentration`, `min_liquidity`, `target_return`) against Monte Carlo metrics.
+  - `buildRecommendation` — deterministic: `hold` if all pass; `rebalance` if any fail, with delta-rebalance on max/min weight assets and human-readable summary.
+  - Returns full structured response: `{ ok, metrics, constraints_check, recommendation, simulated_paths_summary, confidence, error_rate, timestamp }`.
+- [x] **`mlFetch` updated** to accept optional `timeoutMs` parameter (default `ML_TIMEOUT_MS=8000`); portfolio route uses 15000ms. Timeout error message updated to reflect actual timeout used.
+- [x] **`docs/RUNBOOK.md`** updated with P-H1 section: full curl example, response field table, validation rules, bad-input test commands.
+
+Files changed:
+- `ml_service/app.py` — added `hashlib` import, `PortfolioAsset`, `PortfolioMonteCarloIn` models, `_asset_params()` helper, `POST /portfolio/montecarlo` endpoint.
+- `backend/src/index.js` — updated `mlFetch` signature (timeoutMs param), added `validatePortfolioInput`, `checkConstraints`, `buildRecommendation` helpers, `POST /api/portfolio/optimize` route.
+- `docs/RUNBOOK.md` — appended P-H1 section.
+
+Checks run:
+- `node --input-type=module --check` on `backend/src/index.js` → PASS
+- `python -c "import ast; ast.parse(open('ml_service/app.py').read())"` → PASS
+- All validation paths return 400 (never 500); ML timeout returns 502 via `errBody`.
+- No secrets/env files touched.
+
+Blockers:
+- None
+
+Questions for Jarvis:
+- Please mark P-H1 DONE. Monte Carlo runs 1000×30 by default; all acceptance criteria satisfied.
+
+Proposed next action:
+- Awaiting Jarvis next packet.
