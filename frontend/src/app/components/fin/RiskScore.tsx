@@ -380,13 +380,13 @@ export function RiskScore() {
               textAlign: 'center',
             }}>
               <GaugeChart score={output.score} key={output.score} />
-              <div style={{ marginTop: 8, marginBottom: 16, display: 'flex', justifyContent: 'center', gap: 24 }}>
-                <div>
+              <div style={{ marginTop: 8, marginBottom: 16, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 24, flexWrap: 'wrap' }}>
+                <div style={{ textAlign: 'center' }}>
                   <div style={{ fontFamily: C.mono, fontSize: 9, color: C.textDim, marginBottom: 4, letterSpacing: '0.1em' }}>CONFIDENCE</div>
                   <div style={{ fontFamily: C.mono, fontSize: 16, color: C.cyan }}>{output.confidence.toFixed(1)}%</div>
                 </div>
-                <div style={{ width: 1, background: C.border }} />
-                <div>
+                <div style={{ width: 1, height: 32, background: C.border }} />
+                <div style={{ textAlign: 'center' }}>
                   <div style={{ fontFamily: C.mono, fontSize: 9, color: C.textDim, marginBottom: 4, letterSpacing: '0.1em' }}>RISK TIER</div>
                   <div style={{
                     fontFamily: C.mono,
@@ -399,8 +399,8 @@ export function RiskScore() {
                     letterSpacing: '0.12em',
                   }}>{tier.label}</div>
                 </div>
-                <div style={{ width: 1, background: C.border }} />
-                <div>
+                <div style={{ width: 1, height: 32, background: C.border }} />
+                <div style={{ textAlign: 'center' }}>
                   <div style={{ fontFamily: C.mono, fontSize: 9, color: C.textDim, marginBottom: 4, letterSpacing: '0.1em' }}>SCORE</div>
                   <div style={{ fontFamily: C.mono, fontSize: 16, color: scoreColor }}>{output.score}/100</div>
                 </div>

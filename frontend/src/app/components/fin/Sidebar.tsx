@@ -9,11 +9,12 @@ interface StatCardProps {
   borderColor: string;
   icon: React.ReactNode;
   trend?: 'up' | 'down' | null;
+  tooltip?: string;
 }
 
-function StatCard({ label, value, sub, borderColor, icon, trend }: StatCardProps) {
+function StatCard({ label, value, sub, borderColor, icon, trend, tooltip }: StatCardProps) {
   return (
-    <div style={{
+    <div title={tooltip} style={{
       background: C.bgCard,
       border: `1px solid ${C.border}`,
       borderLeft: `3px solid ${borderColor}`,
@@ -84,6 +85,7 @@ export function Sidebar() {
         borderColor={C.red}
         icon={<AlertTriangle size={12} />}
         trend="up"
+        tooltip="Demo data — not connected to live alert feed"
       />
       <StatCard
         label="Models Running"
@@ -91,6 +93,7 @@ export function Sidebar() {
         sub="Risk · Fraud · Portfolio"
         borderColor={C.cyan}
         icon={<Cpu size={12} />}
+        tooltip="Demo data — shows available model count"
       />
       <StatCard
         label="Avg Confidence"
@@ -98,6 +101,7 @@ export function Sidebar() {
         sub="↑ 1.4% from baseline"
         borderColor={C.green}
         icon={<Brain size={12} />}
+        tooltip="Demo data — aggregated from last model runs"}
         trend={null}
       />
       <StatCard
@@ -106,6 +110,7 @@ export function Sidebar() {
         sub="Risk model — latest"
         borderColor={C.orange}
         icon={<Clock size={12} />}
+        tooltip="Demo data — shows time since last model inference"
       />
 
       {/* Divider */}

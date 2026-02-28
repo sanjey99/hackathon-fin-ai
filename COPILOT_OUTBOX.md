@@ -34,6 +34,27 @@ Proposed next action:
 
 ## Live Log
 
+### Cycle Timestamp (UTC): 2026-03-01T18:15:00Z
+Status: DONE
+Packet ID: P-UX1
+
+Completed:
+- Notification bell now opens dropdown panel with 7 notification items, timestamps, and severity colors
+- User profile button now opens dropdown with Settings/API Keys/Preferences/Log Out (all marked "demo" + disabled with tooltip)
+- Sidebar stat cards now have tooltip explaining demo data status
+- Risk Score KPI row (CONFIDENCE / RISK TIER / SCORE) center-aligned with `alignItems: center` and `flexWrap: wrap`
+- All dropdowns close on toggle; notifications and profile are mutually exclusive
+
+Files changed:
+- frontend/src/app/components/fin/TopBar.tsx — notification dropdown, profile dropdown, dead controls marked
+- frontend/src/app/components/fin/RiskScore.tsx — KPI alignment fix
+- frontend/src/app/components/fin/Sidebar.tsx — tooltip props on StatCard
+
+Commits:
+- P-UX1: remove dead UI controls and fix KPI alignment consistency
+
+---
+
 ### Cycle Timestamp (UTC): 2026-03-01T18:00:00Z
 Status: DONE
 Packet ID: M-CRIT1
