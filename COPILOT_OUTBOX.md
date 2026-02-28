@@ -95,3 +95,38 @@ Questions for Jarvis:
 
 Proposed next action:
 - Awaiting Jarvis to queue P-002 (frontend demo cards + dropdown).
+
+---
+
+### Cycle Timestamp (UTC): 2026-03-01T01:00:00Z
+Status: DONE
+Packet ID: P-002
+
+Completed:
+- [x] Created `frontend/src/App.jsx` — full React component tree (CDN Babel, no build step required):
+  - `LeftPanel`: compact nav with brand, live status dots (Backend/ML), demo-case dropdown fed by `GET /api/demo-cases`, `case-desc`, primary CTA "▶ Run Ensemble" (`/api/infer`), secondary CTA "⚡ Run Scenario" (`/api/simulate`), manual feature override behind `<details>` collapsible.
+  - `CentrePanel`: KPI strip (Model, Input Dim, Threshold, Loaded, Scenarios) from `GET /model/info`; market-style demo-cases table.
+  - `DecisionPanel` (right column): renders 5 key outputs — Risk Score, Confidence, Label, Recommendation, Decision Reason — with anomaly/normal colour coding; raw JSON is hidden in `<details class="advanced">`.
+- [x] Rewrote `frontend/index.html` — stripped old single-page card layout; added Inter font, all CSS for 3-column grid, status dots, KPI chips, market table, decision panel, error banner; mounts React + Babel via CDN and loads `src/App.jsx`.
+- [x] All existing API calls preserved exactly: `/api/demo-cases`, `/api/infer`, `/api/simulate`, `/health` (backend), `/model/info` (ML).
+- [x] Typography upscaled (18px KPI values, 20px decision label, 13px body), spacing consistent, visual noise reduced.
+- [x] Main actions ("Run Ensemble", "Run Scenario") are unmissable primary/secondary buttons.
+- [x] Extra diagnostics (raw JSON) hidden behind collapsible "Advanced" section.
+
+Files changed:
+- `frontend/index.html` — full rewrite (3-column shell, CSS, CDN React/Babel loader)
+- `frontend/src/App.jsx` — new file (React component tree, all business logic)
+
+Checks run:
+- HTML syntax review of `frontend/index.html` — valid; no broken tags.
+- JSX/JS review of `frontend/src/App.jsx` — valid syntax; no undefined references; all API URLs use `API`/`ML` constants matching `localhost:4000`/`localhost:8000`.
+- Confirmed no changes to `backend/src/index.js`, `ml_service/app.py`, or any secrets/env files.
+
+Blockers:
+- None. No build toolchain needed; nginx serves `frontend/` directory including new `src/` subfolder.
+
+Questions for Jarvis:
+- Please mark P-002 DONE. Ready for P-003 (audit trail persistence) or P-004 (runbook hardening).
+
+Proposed next action:
+- Awaiting Jarvis next packet (P-003 or P-004).
