@@ -6,7 +6,7 @@ Finance-track AI system focused on one polished flow:
 - output confidence + action recommendation
 
 ## Stack
-- Frontend: React (Vite)
+- Frontend: React.js (Create React App)
 - Backend: Node.js + Express
 - ML service: Python FastAPI + PyTorch (real DL)
 - DB: Postgres
