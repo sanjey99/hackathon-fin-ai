@@ -12,7 +12,21 @@
     html, body, #root { height: 100%; }
     body { background: #070b12; color: #dce8ff; font-family: 'Inter', Arial, sans-serif; font-size: 14px; line-height: 1.55; }
 
-    .layout { display: grid; grid-template-columns: 220px 1fr 320px; gap: 0; height: 100vh; overflow: hidden; }
+    /* ── App shell ── */
+    .app-shell { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+    .tab-content { flex: 1; overflow: hidden; }
+
+    /* ── Tab bar ── */
+    .tab-bar { display: flex; align-items: center; justify-content: space-between; background: #0a0f1c; border-bottom: 1px solid #182035; padding: 0 18px; height: 44px; flex-shrink: 0; }
+    .tab-bar-left { display: flex; align-items: center; gap: 2px; }
+    .tab-bar-right { display: flex; align-items: center; gap: 12px; }
+    .brand-name-sm { font-size: 15px; font-weight: 700; color: #60a5fa; letter-spacing: .5px; margin-right: 18px; }
+    .tab-btn { background: none; border: none; color: #5a7298; font-family: inherit; font-size: 13px; font-weight: 600; padding: 10px 16px; cursor: pointer; border-bottom: 2px solid transparent; transition: color .15s, border-color .15s; }
+    .tab-btn:hover { color: #93c5fd; }
+    .tab-btn.active { color: #60a5fa; border-bottom-color: #60a5fa; }
+
+    /* ── 3-col layout for Risk Score tab ── */
+    .layout-3col { display: grid; grid-template-columns: 220px 1fr 320px; gap: 0; height: 100%; overflow: hidden; }
     .col-left   { background: #0a0f1c; border-right: 1px solid #182035; padding: 20px 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; }
     .col-centre { background: #070b12; border-right: 1px solid #182035; padding: 20px 20px; overflow-y: auto; }
     .col-right  { background: #0a0f1c; padding: 20px 18px; overflow-y: auto; }
@@ -44,6 +58,7 @@
     .btn-secondary:hover { background: #1e2d45; }
     .btn-primary:active, .btn-secondary:active { transform: scale(.97); }
     .btn-primary:disabled, .btn-secondary:disabled { opacity: .4; cursor: not-allowed; }
+    .btn-sm { padding: 7px 12px; font-size: 12px; border-radius: 6px; }
 
     .feat-input { width: 100%; background: #0f182c; border: 1px solid #253351; border-radius: 6px; color: #93c5fd; font-family: 'Menlo', monospace; font-size: 11px; padding: 7px 8px; resize: vertical; margin-top: 6px; }
 
@@ -89,6 +104,114 @@
     .adv-pre { margin-top: 8px; font-family: 'Menlo', monospace; font-size: 11px; color: #5a7298; background: #070b12; border: 1px solid #182035; border-radius: 6px; padding: 10px; white-space: pre-wrap; overflow-x: auto; }
 
     .err-banner { background: #3b0a0a; border: 1px solid #7f1d1d; color: #fca5a5; border-radius: 7px; padding: 10px 13px; font-size: 12px; margin-bottom: 12px; }
+
+    /* ═══════════════════════════════════════════════════════════════════════════
+       PORTFOLIO TAB
+       ═══════════════════════════════════════════════════════════════════════ */
+
+    .pf-layout { display: grid; grid-template-columns: 380px 1fr; gap: 0; height: 100%; overflow: hidden; }
+    .pf-col-left  { background: #0a0f1c; border-right: 1px solid #182035; padding: 20px 18px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; }
+    .pf-col-right { background: #070b12; padding: 24px 28px; overflow-y: auto; }
+
+    /* ── Input modes bar ── */
+    .pf-mode-bar { display: flex; gap: 6px; margin-bottom: 12px; }
+    .pf-mode-btn { background: #0f182c; border: 1px solid #253351; color: #5a7298; border-radius: 6px; padding: 6px 14px; font-size: 12px; font-weight: 600; font-family: inherit; cursor: pointer; transition: all .15s; }
+    .pf-mode-btn:hover { border-color: #3b5998; color: #93c5fd; }
+    .pf-mode-btn.active { background: #162a4a; border-color: #60a5fa; color: #60a5fa; }
+
+    /* ── Presets ── */
+    .pf-presets { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+    .pf-preset-card { background: #0c1524; border: 1px solid #1e2e47; border-radius: 8px; padding: 12px 14px; text-align: left; cursor: pointer; transition: all .15s; display: flex; flex-direction: column; gap: 2px; }
+    .pf-preset-card:hover { border-color: #60a5fa; background: #0f1d35; }
+    .pf-preset-name { font-size: 13px; font-weight: 600; color: #93c5fd; }
+    .pf-preset-detail { font-size: 11px; color: #4a6080; }
+
+    /* ── CSV ── */
+    .pf-csv-section { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+    .pf-csv-input { width: 100%; background: #0f182c; border: 1px solid #253351; border-radius: 6px; color: #93c5fd; font-family: 'Menlo', monospace; font-size: 11px; padding: 8px 10px; resize: vertical; }
+    .pf-csv-input::placeholder { color: #2a3d58; }
+
+    /* ── Manual asset rows ── */
+    .pf-assets-list { display: flex; flex-direction: column; gap: 0; margin-bottom: 10px; }
+    .pf-row { display: grid; grid-template-columns: 1fr 80px 32px; gap: 6px; align-items: center; padding: 5px 0; border-bottom: 1px solid #0f1928; }
+    .pf-header-row { border-bottom: 1px solid #182035; padding-bottom: 6px; margin-bottom: 2px; }
+    .pf-header-row span { font-size: 10px; font-weight: 600; color: #4a6080; text-transform: uppercase; letter-spacing: .8px; }
+    .pf-sym-input, .pf-wt-input { background: #0f182c; border: 1px solid #253351; border-radius: 5px; color: #dce8ff; padding: 6px 8px; font-size: 12px; font-family: inherit; outline: none; width: 100%; }
+    .pf-sym-input:focus, .pf-wt-input:focus { border-color: #60a5fa; }
+    .pf-sym-input { text-transform: uppercase; font-weight: 600; color: #93c5fd; }
+    .pf-wt-input { text-align: right; font-variant-numeric: tabular-nums; }
+    .pf-rm-btn { background: none; border: 1px solid transparent; color: #5a7298; font-size: 16px; cursor: pointer; border-radius: 4px; padding: 2px 6px; transition: all .15s; line-height: 1; }
+    .pf-rm-btn:hover { color: #f87171; border-color: #7f1d1d; background: #1a0a0a; }
+
+    .pf-add-row { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; }
+    .pf-weight-sum { font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .pf-weight-sum.ok { color: #4ade80; }
+    .pf-weight-sum.warn { color: #f87171; }
+
+    /* ── Constraints panel ── */
+    .pf-constraints-panel { }
+    .pf-cstr-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .pf-cstr-item { display: flex; flex-direction: column; gap: 3px; }
+    .pf-cstr-label { font-size: 10px; font-weight: 600; color: #4a6080; text-transform: uppercase; letter-spacing: .6px; }
+    .pf-cstr-input { background: #0f182c; border: 1px solid #253351; border-radius: 5px; color: #dce8ff; padding: 7px 9px; font-size: 12px; font-family: inherit; outline: none; font-variant-numeric: tabular-nums; }
+    .pf-cstr-input:focus { border-color: #60a5fa; }
+    .pf-cstr-input::placeholder { color: #2a3d58; }
+
+    /* ── Run button ── */
+    .pf-run-btn { width: 100%; padding: 13px; font-size: 14px; border-radius: 10px; letter-spacing: .3px; }
+    .pf-validation-hint { font-size: 11px; color: #f87171; margin-top: 4px; text-align: center; }
+
+    /* ── Result panel ── */
+    .pf-results { }
+    .pf-loading { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 48px 20px; color: #5a7298; font-size: 14px; }
+    .pf-spinner { width: 36px; height: 36px; border: 3px solid #182035; border-top-color: #60a5fa; border-radius: 50%; animation: pf-spin .8s linear infinite; }
+    @keyframes pf-spin { to { transform: rotate(360deg); } }
+
+    .pf-empty-state { text-align: center; padding: 48px 24px; }
+    .pf-empty-icon { font-size: 40px; margin-bottom: 12px; opacity: .6; }
+    .pf-empty-title { font-size: 16px; font-weight: 600; color: #5a7298; margin-bottom: 8px; }
+    .pf-empty-sub { font-size: 12px; color: #3d5070; line-height: 1.6; max-width: 380px; margin: 0 auto; }
+
+    /* ── KPI Grid ── */
+    .pf-kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .pf-kpi-card { background: #0c1524; border: 1px solid #1e2e47; border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; gap: 4px; }
+    .pf-kpi-card.red-glow  { border-color: #3b1515; }
+    .pf-kpi-card.green-glow { border-color: #15332a; }
+    .pf-kpi-label { font-size: 10px; font-weight: 600; color: #4a6080; text-transform: uppercase; letter-spacing: .8px; }
+    .pf-kpi-val { font-size: 22px; font-weight: 700; color: #dce8ff; font-variant-numeric: tabular-nums; }
+    .pf-kpi-val.red   { color: #f87171; }
+    .pf-kpi-val.green { color: #4ade80; }
+    .pf-kpi-val.amber { color: #fbbf24; }
+
+    /* ── Recommendation card ── */
+    .pf-rec-card { border-radius: 10px; padding: 16px 18px; margin-top: 4px; }
+    .pf-rec-card.hold { background: #09120d; border: 1px solid #14532d; }
+    .pf-rec-card.rebalance { background: #12100a; border: 1px solid #78350f; }
+    .pf-rec-action { font-size: 18px; font-weight: 700; margin-bottom: 8px; letter-spacing: .5px; }
+    .pf-rec-card.hold .pf-rec-action { color: #4ade80; }
+    .pf-rec-card.rebalance .pf-rec-action { color: #fbbf24; }
+    .pf-rec-summary { font-size: 13px; color: #7a9abf; line-height: 1.6; }
+
+    /* ── Constraints check badges ── */
+    .pf-cc-row { display: flex; flex-wrap: wrap; gap: 8px; }
+    .pf-cc-badge { font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 5px; letter-spacing: .3px; }
+    .pf-cc-badge.pass { background: #052e16; color: #4ade80; border: 1px solid #14532d; }
+    .pf-cc-badge.fail { background: #2a0a0a; color: #f87171; border: 1px solid #7f1d1d; }
+
+    /* ── Proposed weights table ── */
+    .pf-weights-table { margin-top: 4px; }
+    .pf-alloc-bar-bg { width: 100%; height: 8px; background: #0f182c; border-radius: 4px; overflow: hidden; }
+    .pf-alloc-bar { height: 100%; background: linear-gradient(90deg, #2563eb, #60a5fa); border-radius: 4px; transition: width .3s; }
+
+    /* ── Paths summary strip ── */
+    .pf-paths-strip { display: flex; flex-wrap: wrap; gap: 10px; }
+    .pf-sim-note { font-size: 11px; color: #3d5070; margin-top: 8px; }
+
+    /* ── Scrollbar styling ── */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #1e2e47; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #2a4060; }
   </style>
 </head>
 <body>

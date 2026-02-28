@@ -1,7 +1,7 @@
-/* FinSentinel Terminal — P-002 UI
-   OpenBB/Bloomberg-inspired 3-column layout.
+/* FinSentinel Terminal — P-H2: Portfolio Optimisation hero tab
+   OpenBB/Bloomberg-inspired layout with tabbed navigation.
    Loaded via Babel standalone (CDN) from index.html.
-   All existing API calls preserved: /api/demo-cases, /api/infer, /api/simulate, /health, /model/info
+   API: /api/portfolio/optimize, /api/demo-cases, /api/infer, /api/simulate, /health, /model/info
 */
 
 const API = 'http://localhost:4000';
@@ -9,6 +9,8 @@ const ML  = 'http://localhost:8000';
 
 // ─── tiny helpers ────────────────────────────────────────────────────────────
 const cls = (...a) => a.filter(Boolean).join(' ');
+const pct = (v, d = 1) => typeof v === 'number' ? (v * 100).toFixed(d) + '%' : '—';
+const fmt = (v, d = 4) => typeof v === 'number' ? v.toFixed(d) : '—';
 
 function useFetch(url) {
   const [data, setData] = React.useState(null);
@@ -18,6 +20,38 @@ function useFetch(url) {
   }, [url]);
   return { data, err };
 }
+
+// ─── Presets ─────────────────────────────────────────────────────────────────
+const PRESETS = {
+  'Tech Heavy': [
+    { symbol: 'AAPL', weight: 0.30 },
+    { symbol: 'MSFT', weight: 0.25 },
+    { symbol: 'NVDA', weight: 0.20 },
+    { symbol: 'GOOGL', weight: 0.15 },
+    { symbol: 'AMZN', weight: 0.10 },
+  ],
+  'Balanced': [
+    { symbol: 'SPY', weight: 0.30 },
+    { symbol: 'BND', weight: 0.25 },
+    { symbol: 'VWO', weight: 0.15 },
+    { symbol: 'GLD', weight: 0.15 },
+    { symbol: 'QQQ', weight: 0.15 },
+  ],
+  'Conservative Bond': [
+    { symbol: 'BND', weight: 0.40 },
+    { symbol: 'TLT', weight: 0.25 },
+    { symbol: 'LQD', weight: 0.20 },
+    { symbol: 'TIPS', weight: 0.10 },
+    { symbol: 'SHY', weight: 0.05 },
+  ],
+  'Crypto Mix': [
+    { symbol: 'BTC', weight: 0.40 },
+    { symbol: 'ETH', weight: 0.30 },
+    { symbol: 'SOL', weight: 0.15 },
+    { symbol: 'LINK', weight: 0.10 },
+    { symbol: 'DOT', weight: 0.05 },
+  ],
+};
 
 // ─── KPI chip ────────────────────────────────────────────────────────────────
 function KpiChip({ label, value, accent }) {
@@ -39,7 +73,424 @@ function StatusDot({ ok, label }) {
   );
 }
 
-// ─── Decision card ───────────────────────────────────────────────────────────
+// ─── Tab bar ─────────────────────────────────────────────────────────────────
+function TabBar({ tabs, active, onChange, beOk, mlOk }) {
+  return (
+    <div className="tab-bar">
+      <div className="tab-bar-left">
+        <span className="brand-name-sm">FinSentinel</span>
+        {tabs.map(t => (
+          <button
+            key={t.id}
+            className={cls('tab-btn', active === t.id && 'active')}
+            onClick={() => onChange(t.id)}
+          >
+            {t.icon} {t.label}
+          </button>
+        ))}
+      </div>
+      <div className="tab-bar-right">
+        <StatusDot ok={beOk} label="Backend" />
+        <StatusDot ok={mlOk} label="ML" />
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ─── PORTFOLIO OPTIMISATION TAB ──────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function PortfolioInputPanel({ assets, setAssets, inputMode, setInputMode, csvText, setCsvText }) {
+  function addRow() {
+    setAssets([...assets, { symbol: '', weight: 0 }]);
+  }
+  function removeRow(i) {
+    setAssets(assets.filter((_, idx) => idx !== i));
+  }
+  function updateRow(i, field, val) {
+    const next = assets.map((a, idx) => idx === i ? { ...a, [field]: field === 'weight' ? Number(val) : val.toUpperCase() } : a);
+    setAssets(next);
+  }
+  function loadPreset(name) {
+    setAssets(PRESETS[name].map(a => ({ ...a })));
+    setInputMode('manual');
+  }
+  function parseCSV() {
+    try {
+      const lines = csvText.trim().split('\n').filter(Boolean);
+      const parsed = lines.map(line => {
+        const parts = line.split(',').map(s => s.trim());
+        return { symbol: parts[0].toUpperCase(), weight: parseFloat(parts[1]) || 0 };
+      }).filter(a => a.symbol);
+      if (parsed.length > 0) { setAssets(parsed); setInputMode('manual'); }
+    } catch (e) { /* ignore parse errors */ }
+  }
+
+  const weightSum = assets.reduce((s, a) => s + (a.weight || 0), 0);
+
+  return (
+    <div className="pf-input-panel">
+      <div className="section-heading">Portfolio Input</div>
+
+      {/* Mode switches */}
+      <div className="pf-mode-bar">
+        {['manual', 'preset', 'csv'].map(m => (
+          <button key={m} className={cls('pf-mode-btn', inputMode === m && 'active')} onClick={() => setInputMode(m)}>
+            {m === 'manual' ? '✎ Manual' : m === 'preset' ? '☰ Preset' : '⬆ CSV'}
+          </button>
+        ))}
+      </div>
+
+      {/* Preset mode */}
+      {inputMode === 'preset' && (
+        <div className="pf-presets">
+          {Object.keys(PRESETS).map(name => (
+            <button key={name} className="pf-preset-card" onClick={() => loadPreset(name)}>
+              <span className="pf-preset-name">{name}</span>
+              <span className="pf-preset-detail">{PRESETS[name].length} assets</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* CSV mode */}
+      {inputMode === 'csv' && (
+        <div className="pf-csv-section">
+          <p className="hint">Paste CSV: one row per asset.  Format: <code>SYMBOL,WEIGHT</code></p>
+          <textarea
+            className="pf-csv-input"
+            rows={5}
+            placeholder={"AAPL,0.30\nMSFT,0.25\nNVDA,0.20\nGOOGL,0.15\nAMZN,0.10"}
+            value={csvText}
+            onChange={e => setCsvText(e.target.value)}
+          />
+          <button className="btn-secondary btn-sm" onClick={parseCSV}>Parse CSV</button>
+        </div>
+      )}
+
+      {/* Manual assets table (always visible) */}
+      {inputMode === 'manual' && (
+        <div className="pf-assets-list">
+          <div className="pf-row pf-header-row">
+            <span className="pf-cell sym-head">Symbol</span>
+            <span className="pf-cell wt-head">Weight</span>
+            <span className="pf-cell act-head"></span>
+          </div>
+          {assets.map((a, i) => (
+            <div key={i} className="pf-row">
+              <input
+                className="pf-cell pf-sym-input"
+                value={a.symbol}
+                onChange={e => updateRow(i, 'symbol', e.target.value)}
+                placeholder="AAPL"
+                maxLength={10}
+              />
+              <input
+                className="pf-cell pf-wt-input"
+                type="number"
+                step="0.01"
+                min="0"
+                max="1"
+                value={a.weight}
+                onChange={e => updateRow(i, 'weight', e.target.value)}
+              />
+              <button className="pf-cell pf-rm-btn" onClick={() => removeRow(i)} title="Remove">×</button>
+            </div>
+          ))}
+          <div className="pf-add-row">
+            <button className="btn-secondary btn-sm" onClick={addRow}>+ Add Asset</button>
+            <span className={cls('pf-weight-sum', Math.abs(weightSum - 1) > 0.03 ? 'warn' : 'ok')}>
+              Σ {weightSum.toFixed(2)}
+            </span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ConstraintsPanel({ constraints, setConstraints }) {
+  function upd(key, val) {
+    setConstraints(prev => ({ ...prev, [key]: val }));
+  }
+
+  return (
+    <div className="pf-constraints-panel">
+      <div className="section-heading">Constraints & Parameters</div>
+      <div className="pf-cstr-grid">
+        <label className="pf-cstr-item">
+          <span className="pf-cstr-label">Max Drawdown</span>
+          <input type="number" step="0.01" min="0" max="1" placeholder="e.g. 0.15"
+            value={constraints.max_drawdown} onChange={e => upd('max_drawdown', e.target.value)} className="pf-cstr-input" />
+        </label>
+        <label className="pf-cstr-item">
+          <span className="pf-cstr-label">Max Concentration</span>
+          <input type="number" step="0.01" min="0" max="1" placeholder="e.g. 0.40"
+            value={constraints.max_concentration} onChange={e => upd('max_concentration', e.target.value)} className="pf-cstr-input" />
+        </label>
+        <label className="pf-cstr-item">
+          <span className="pf-cstr-label">Min Liquidity</span>
+          <input type="number" step="0.01" min="0" max="1" placeholder="e.g. 0.05"
+            value={constraints.min_liquidity} onChange={e => upd('min_liquidity', e.target.value)} className="pf-cstr-input" />
+        </label>
+        <label className="pf-cstr-item">
+          <span className="pf-cstr-label">Target Return</span>
+          <input type="number" step="0.001" min="-1" max="5" placeholder="e.g. 0.05"
+            value={constraints.target_return} onChange={e => upd('target_return', e.target.value)} className="pf-cstr-input" />
+        </label>
+        <label className="pf-cstr-item">
+          <span className="pf-cstr-label">Simulations</span>
+          <input type="number" step="100" min="100" max="100000"
+            value={constraints.simulations} onChange={e => upd('simulations', e.target.value)} className="pf-cstr-input" />
+        </label>
+        <label className="pf-cstr-item">
+          <span className="pf-cstr-label">Horizon (days)</span>
+          <input type="number" step="1" min="1" max="365"
+            value={constraints.horizon_days} onChange={e => upd('horizon_days', e.target.value)} className="pf-cstr-input" />
+        </label>
+      </div>
+    </div>
+  );
+}
+
+function PortfolioResults({ result, loading, error }) {
+  if (loading) {
+    return (
+      <div className="pf-results">
+        <div className="pf-loading">
+          <div className="pf-spinner" />
+          <span>Running Monte Carlo simulation…</span>
+        </div>
+      </div>
+    );
+  }
+  if (error) {
+    return (
+      <div className="pf-results">
+        <div className="err-banner">{error}</div>
+      </div>
+    );
+  }
+  if (!result) {
+    return (
+      <div className="pf-results">
+        <div className="pf-empty-state">
+          <div className="pf-empty-icon">📊</div>
+          <div className="pf-empty-title">No Results Yet</div>
+          <div className="pf-empty-sub">Configure your portfolio and click <strong>Run Optimisation</strong> to see risk metrics, recommendations, and proposed weights.</div>
+        </div>
+      </div>
+    );
+  }
+
+  const m = result.metrics || {};
+  const rec = result.recommendation || {};
+  const cc = result.constraints_check || {};
+  const paths = result.simulated_paths_summary || {};
+  const isRebalance = rec.action === 'rebalance';
+
+  return (
+    <div className="pf-results">
+      {/* ── Risk Metrics KPIs ── */}
+      <div className="section-heading">Risk Metrics</div>
+      <div className="pf-kpi-grid">
+        <div className="pf-kpi-card red-glow">
+          <span className="pf-kpi-label">VaR (95%)</span>
+          <span className="pf-kpi-val red">{pct(m.var_95, 2)}</span>
+        </div>
+        <div className="pf-kpi-card red-glow">
+          <span className="pf-kpi-label">CVaR (95%)</span>
+          <span className="pf-kpi-val red">{pct(m.cvar_95, 2)}</span>
+        </div>
+        <div className="pf-kpi-card">
+          <span className="pf-kpi-label">P(Loss)</span>
+          <span className={cls('pf-kpi-val', m.probability_of_loss > 0.5 ? 'red' : 'amber')}>{pct(m.probability_of_loss, 1)}</span>
+        </div>
+        <div className="pf-kpi-card green-glow">
+          <span className="pf-kpi-label">Expected Return</span>
+          <span className={cls('pf-kpi-val', m.expected_return >= 0 ? 'green' : 'red')}>{pct(m.expected_return, 2)}</span>
+        </div>
+        <div className="pf-kpi-card">
+          <span className="pf-kpi-label">Confidence</span>
+          <span className="pf-kpi-val">{pct(result.confidence, 1)}</span>
+        </div>
+        <div className="pf-kpi-card">
+          <span className="pf-kpi-label">Error Rate</span>
+          <span className="pf-kpi-val">{fmt(result.error_rate, 4)}</span>
+        </div>
+      </div>
+
+      {/* ── Recommendation ── */}
+      <div className="section-heading" style={{ marginTop: '20px' }}>Recommendation</div>
+      <div className={cls('pf-rec-card', isRebalance ? 'rebalance' : 'hold')}>
+        <div className="pf-rec-action">
+          {isRebalance ? '⚖ REBALANCE' : '✓ HOLD'}
+        </div>
+        <div className="pf-rec-summary">{rec.summary || '—'}</div>
+      </div>
+
+      {/* ── Constraints Check ── */}
+      {Object.keys(cc).length > 0 && (
+        <React.Fragment>
+          <div className="section-heading" style={{ marginTop: '16px' }}>Constraints Check</div>
+          <div className="pf-cc-row">
+            {Object.entries(cc).map(([k, v]) => (
+              <span key={k} className={cls('pf-cc-badge', v ? 'pass' : 'fail')}>
+                {v ? '✓' : '✗'} {k.replace(/_pass$/, '').replace(/_/g, ' ')}
+              </span>
+            ))}
+          </div>
+        </React.Fragment>
+      )}
+
+      {/* ── Proposed Weights Table ── */}
+      {rec.proposed_weights && rec.proposed_weights.length > 0 && (
+        <React.Fragment>
+          <div className="section-heading" style={{ marginTop: '16px' }}>Proposed Weights</div>
+          <table className="market-table pf-weights-table">
+            <thead>
+              <tr>
+                <th>Symbol</th>
+                <th style={{textAlign:'right'}}>Weight</th>
+                <th style={{textAlign:'right'}}>Allocation</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rec.proposed_weights.map((pw, i) => (
+                <tr key={i}>
+                  <td className="name">{pw.symbol}</td>
+                  <td style={{textAlign:'right', fontVariantNumeric:'tabular-nums'}}>{pw.weight.toFixed(4)}</td>
+                  <td style={{textAlign:'right'}}>
+                    <div className="pf-alloc-bar-bg">
+                      <div className="pf-alloc-bar" style={{ width: `${Math.min(pw.weight * 100, 100)}%` }} />
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </React.Fragment>
+      )}
+
+      {/* ── Simulation Summary ── */}
+      {paths.simulations && (
+        <React.Fragment>
+          <div className="section-heading" style={{ marginTop: '16px' }}>Simulation Summary</div>
+          <div className="pf-paths-strip">
+            <KpiChip label="Min" value={paths.min_final?.toFixed(4)} accent="red" />
+            <KpiChip label="P25" value={paths.p25_final?.toFixed(4)} />
+            <KpiChip label="Median" value={paths.median_final?.toFixed(4)} />
+            <KpiChip label="P75" value={paths.p75_final?.toFixed(4)} />
+            <KpiChip label="Max" value={paths.max_final?.toFixed(4)} accent="green" />
+          </div>
+          <p className="pf-sim-note">{paths.simulations.toLocaleString()} simulations · {paths.horizon_days} day horizon</p>
+        </React.Fragment>
+      )}
+
+      {/* ── Raw JSON ── */}
+      <details className="advanced" style={{ marginTop: '16px' }}>
+        <summary>Raw Response</summary>
+        <pre className="adv-pre">{JSON.stringify(result, null, 2)}</pre>
+      </details>
+    </div>
+  );
+}
+
+function PortfolioTab() {
+  const [inputMode, setInputMode] = React.useState('preset');
+  const [assets, setAssets] = React.useState(PRESETS['Tech Heavy'].map(a => ({ ...a })));
+  const [csvText, setCsvText] = React.useState('');
+  const [constraints, setConstraints] = React.useState({
+    max_drawdown: '',
+    max_concentration: '',
+    min_liquidity: '',
+    target_return: '',
+    simulations: 1000,
+    horizon_days: 30,
+  });
+
+  const [result, setResult] = React.useState(null);
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState(null);
+
+  async function runOptimisation() {
+    setLoading(true); setError(null); setResult(null);
+
+    // Build constraints object — only include non-empty numeric values
+    const cObj = {};
+    if (constraints.max_drawdown !== '')     cObj.max_drawdown      = parseFloat(constraints.max_drawdown);
+    if (constraints.max_concentration !== '') cObj.max_concentration = parseFloat(constraints.max_concentration);
+    if (constraints.min_liquidity !== '')     cObj.min_liquidity     = parseFloat(constraints.min_liquidity);
+    if (constraints.target_return !== '')     cObj.target_return     = parseFloat(constraints.target_return);
+
+    const body = {
+      assets: assets.filter(a => a.symbol.trim() !== ''),
+      constraints: cObj,
+      simulations:  parseInt(constraints.simulations, 10) || 1000,
+      horizon_days: parseInt(constraints.horizon_days, 10) || 30,
+    };
+
+    try {
+      const r = await fetch(`${API}/api/portfolio/optimize`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || d.message || `HTTP ${r.status}`);
+      setResult(d);
+    } catch (e) {
+      setError(String(e.message || e));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const weightSum = assets.reduce((s, a) => s + (a.weight || 0), 0);
+  const validAssets = assets.filter(a => a.symbol.trim() !== '').length;
+  const canSubmit = validAssets >= 1 && Math.abs(weightSum - 1) <= 0.03 && !loading;
+
+  return (
+    <div className="pf-layout">
+      {/* ── Left: inputs ── */}
+      <div className="pf-col-left">
+        <PortfolioInputPanel
+          assets={assets}
+          setAssets={setAssets}
+          inputMode={inputMode}
+          setInputMode={setInputMode}
+          csvText={csvText}
+          setCsvText={setCsvText}
+        />
+        <ConstraintsPanel constraints={constraints} setConstraints={setConstraints} />
+
+        <button
+          className="btn-primary pf-run-btn"
+          disabled={!canSubmit}
+          onClick={runOptimisation}
+        >
+          {loading ? '⏳ Running…' : '▶ Run Optimisation'}
+        </button>
+        {!canSubmit && !loading && (
+          <p className="pf-validation-hint">
+            {validAssets < 1 ? 'Add at least 1 asset.' : `Weights must sum to 1.00 (currently ${weightSum.toFixed(2)})`}
+          </p>
+        )}
+      </div>
+
+      {/* ── Right: results ── */}
+      <div className="pf-col-right">
+        <PortfolioResults result={result} loading={loading} error={error} />
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ─── RISK SCORE TAB (original flow, preserved) ──────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+
 function DecisionPanel({ result, loading }) {
   if (loading) return <div className="decision-panel loading">Analyzing…</div>;
   if (!result)  return <div className="decision-panel empty">Run a scenario to see output.</div>;
@@ -85,115 +536,16 @@ function DecisionPanel({ result, loading }) {
   );
 }
 
-// ─── Left column ─────────────────────────────────────────────────────────────
-function LeftPanel({ demoCases, selectedCase, onSelectCase, onRunEnsemble, onRunScenario, loading, beOk, mlOk }) {
-  return (
-    <div className="col-left">
-      <div className="brand">
-        <span className="brand-name">FinSentinel</span>
-        <span className="brand-tag">Finance Intelligence</span>
-      </div>
-
-      <div className="status-bar">
-        <StatusDot ok={beOk} label="Backend" />
-        <StatusDot ok={mlOk} label="ML" />
-      </div>
-
-      <div className="section-heading">Scenario</div>
-      <select
-        className="case-select"
-        value={selectedCase}
-        onChange={e => onSelectCase(Number(e.target.value))}
-      >
-        {(demoCases || []).map((c, i) => (
-          <option key={i} value={i}>{c.name}</option>
-        ))}
-      </select>
-      {demoCases && demoCases[selectedCase] && (
-        <p className="case-desc">{demoCases[selectedCase].description}</p>
-      )}
-
-      <div className="cta-group">
-        <button className="btn-primary" onClick={onRunEnsemble} disabled={loading}>
-          {loading ? 'Running…' : '▶ Run Ensemble'}
-        </button>
-        <button className="btn-secondary" onClick={onRunScenario} disabled={loading}>
-          ⚡ Run Scenario
-        </button>
-      </div>
-
-      <div className="section-heading" style={{marginTop:'24px'}}>Features</div>
-      <p className="hint">Selected case features are sent automatically. Override below if needed.</p>
-
-      <details className="advanced">
-        <summary>Manual override</summary>
-        <textarea
-          id="manual-features"
-          className="feat-input"
-          defaultValue="0.1,0.4,0.2,0.3,0.8,0.2,0.5,0.9"
-          rows={3}
-        />
-      </details>
-    </div>
-  );
-}
-
-// ─── Centre column ────────────────────────────────────────────────────────────
-function CentrePanel({ modelInfo, demoCases }) {
-  const KPI_CASES = demoCases ? demoCases.length : 0;
-
-  return (
-    <div className="col-centre">
-      <div className="section-heading">Model Overview</div>
-      <div className="kpi-strip">
-        <KpiChip label="Model"      value={modelInfo?.model_type} />
-        <KpiChip label="Input Dim"  value={modelInfo?.input_dim} />
-        <KpiChip label="Threshold"  value={modelInfo?.threshold} />
-        <KpiChip label="Loaded"     value={modelInfo?.model_loaded ? 'Yes' : 'No'} accent={modelInfo?.model_loaded ? 'green' : 'red'} />
-        <KpiChip label="Scenarios"  value={KPI_CASES} />
-      </div>
-
-      <div className="section-heading" style={{marginTop:'20px'}}>Demo Cases</div>
-      <table className="market-table">
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>Name</th>
-            <th>Description</th>
-            <th>Vectors</th>
-          </tr>
-        </thead>
-        <tbody>
-          {(demoCases || []).map((c, i) => (
-            <tr key={i}>
-              <td className="idx">{i + 1}</td>
-              <td className="name">{c.name}</td>
-              <td className="desc">{c.description}</td>
-              <td className="vecs">{c.features?.length ?? '?'}D</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-// ─── Root App ─────────────────────────────────────────────────────────────────
-function App() {
+function RiskScoreTab() {
   const { data: demoCasesData } = useFetch(`${API}/api/demo-cases`);
-  const { data: modelInfoData }  = useFetch(`${ML}/model/info`);
-  const { data: beHealthData }   = useFetch(`${API}/health`);
-  const { data: mlHealthData }   = useFetch(`${ML}/health`);
-
+  const { data: modelInfoData } = useFetch(`${ML}/model/info`);
   const demoCases = demoCasesData?.cases ?? null;
   const modelInfo = modelInfoData ?? null;
-  const beOk = beHealthData?.ok === true;
-  const mlOk = mlHealthData?.ok === true;
 
   const [selectedCase, setSelectedCase] = React.useState(0);
-  const [result,  setResult]  = React.useState(null);
+  const [result, setResult]   = React.useState(null);
   const [loading, setLoading] = React.useState(false);
-  const [errMsg,  setErrMsg]  = React.useState(null);
+  const [errMsg, setErrMsg]   = React.useState(null);
 
   async function getFeatures(useManual) {
     if (useManual) {
@@ -232,23 +584,97 @@ function App() {
     finally { setLoading(false); }
   }
 
+  const KPI_CASES = demoCases ? demoCases.length : 0;
+
   return (
-    <div className="layout">
-      <LeftPanel
-        demoCases={demoCases}
-        selectedCase={selectedCase}
-        onSelectCase={setSelectedCase}
-        onRunEnsemble={runEnsemble}
-        onRunScenario={runScenario}
-        loading={loading}
-        beOk={beOk}
-        mlOk={mlOk}
-      />
-      <CentrePanel modelInfo={modelInfo} demoCases={demoCases} />
+    <div className="layout-3col">
+      <div className="col-left">
+        <div className="section-heading">Scenario</div>
+        <select className="case-select" value={selectedCase} onChange={e => setSelectedCase(Number(e.target.value))}>
+          {(demoCases || []).map((c, i) => (
+            <option key={i} value={i}>{c.name}</option>
+          ))}
+        </select>
+        {demoCases && demoCases[selectedCase] && (
+          <p className="case-desc">{demoCases[selectedCase].description}</p>
+        )}
+
+        <div className="cta-group" style={{ marginTop: '14px' }}>
+          <button className="btn-primary" onClick={runEnsemble} disabled={loading}>
+            {loading ? 'Running…' : '▶ Run Ensemble'}
+          </button>
+          <button className="btn-secondary" onClick={runScenario} disabled={loading}>
+            ⚡ Run Scenario
+          </button>
+        </div>
+
+        <div className="section-heading" style={{marginTop:'24px'}}>Features</div>
+        <p className="hint">Selected case features are sent automatically. Override below if needed.</p>
+        <details className="advanced">
+          <summary>Manual override</summary>
+          <textarea id="manual-features" className="feat-input" defaultValue="0.1,0.4,0.2,0.3,0.8,0.2,0.5,0.9" rows={3} />
+        </details>
+      </div>
+
+      <div className="col-centre">
+        <div className="section-heading">Model Overview</div>
+        <div className="kpi-strip">
+          <KpiChip label="Model"     value={modelInfo?.model_type} />
+          <KpiChip label="Input Dim" value={modelInfo?.input_dim} />
+          <KpiChip label="Threshold" value={modelInfo?.threshold} />
+          <KpiChip label="Loaded"    value={modelInfo?.model_loaded ? 'Yes' : 'No'} accent={modelInfo?.model_loaded ? 'green' : 'red'} />
+          <KpiChip label="Scenarios" value={KPI_CASES} />
+        </div>
+
+        <div className="section-heading" style={{marginTop:'20px'}}>Demo Cases</div>
+        <table className="market-table">
+          <thead>
+            <tr><th>#</th><th>Name</th><th>Description</th><th>Vectors</th></tr>
+          </thead>
+          <tbody>
+            {(demoCases || []).map((c, i) => (
+              <tr key={i}>
+                <td className="idx">{i + 1}</td>
+                <td className="name">{c.name}</td>
+                <td className="desc">{c.description}</td>
+                <td className="vecs">{c.features?.length ?? '?'}D</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
       <div className="col-right">
         <div className="section-heading">Decision Output</div>
         {errMsg && <div className="err-banner">{errMsg}</div>}
         <DecisionPanel result={result} loading={loading} />
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ─── ROOT APP WITH TABS ─────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const TABS = [
+  { id: 'portfolio', label: 'Portfolio', icon: '📊' },
+  { id: 'risk',      label: 'Risk Score', icon: '🛡' },
+];
+
+function App() {
+  const [activeTab, setActiveTab] = React.useState('portfolio');
+  const { data: beHealthData } = useFetch(`${API}/health`);
+  const { data: mlHealthData } = useFetch(`${ML}/health`);
+  const beOk = beHealthData?.ok === true;
+  const mlOk = mlHealthData?.ok === true;
+
+  return (
+    <div className="app-shell">
+      <TabBar tabs={TABS} active={activeTab} onChange={setActiveTab} beOk={beOk} mlOk={mlOk} />
+      <div className="tab-content">
+        {activeTab === 'portfolio' && <PortfolioTab />}
+        {activeTab === 'risk' && <RiskScoreTab />}
       </div>
     </div>
   );
