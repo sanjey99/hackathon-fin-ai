@@ -1,10 +1,6 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { createServer } from 'http';
-import { WebSocketServer } from 'ws';
-import { getMarketSnapshot } from './adapters/marketData.js';
-import { inferRegime, runEnsemble } from './engine/ensemble.js';
 
 dotenv.config();
 const app = express();
@@ -12,39 +8,50 @@ app.use(cors());
 app.use(express.json());
 
 const ML_URL = process.env.ML_URL || 'http://localhost:8000';
+const ML_TIMEOUT_MS = 8000;
 
-const DEMO_CASES = [
-  { name: 'normal_profile', features: [0.12, 0.08, -0.1, 0.03, 0.15, -0.06, 0.02, 0.01] },
-  { name: 'suspicious_profile', features: [1.2, 0.95, -0.45, 0.3, 0.1, 1.1, 0.2, 0.5] },
-  { name: 'portfolio_stress', features: [0.6, 0.7, -0.3, 0.5, -0.4, 0.9, -0.2, 0.1] },
-];
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
-function validPayload(body) {
-  if (!body || !Array.isArray(body.features)) return 'features must be an array';
-  if (body.features.length < 1 || body.features.length > 64) return 'features length must be 1..64';
-  if (!body.features.every((x) => Number.isFinite(Number(x)))) return 'features must contain only numbers';
+/** Standard error response body. */
+function errBody(error, context = undefined) {
+  const body = { ok: false, error: String(error), ts: new Date().toISOString() };
+  if (context !== undefined) body.context = String(context);
+  return body;
+}
+
+/**
+ * fetch() wrapper with AbortController timeout.
+ * Throws a descriptive Error on timeout or network failure.
+ */
+async function mlFetch(path, opts = {}) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ML_TIMEOUT_MS);
+  try {
+    const res = await fetch(`${ML_URL}${path}`, { ...opts, signal: controller.signal });
+    return res;
+  } catch (e) {
+    if (e.name === 'AbortError') {
+      throw new Error(`ML service timed out after ${ML_TIMEOUT_MS}ms (${path})`);
+    }
+    throw new Error(`ML service unreachable: ${e.message}`);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** Validate features array; returns null if valid, or a 400-ready message. */
+function validateFeatures(features) {
+  if (features === undefined || features === null) return '"features" field is required.';
+  if (!Array.isArray(features)) return '"features" must be an array.';
+  if (features.length < 1 || features.length > 64)
+    return `"features" length must be between 1 and 64 (got ${features.length}).`;
+  if (!features.every(v => typeof v === 'number' && isFinite(v)))
+    return '"features" must contain only finite numeric values.';
   return null;
 }
 
-app.get('/health', (_req, res) => res.json({ ok: true, service: 'backend' }));
-app.get('/api/demo-cases', (_req, res) => res.json({ ok: true, cases: DEMO_CASES }));
+// ── Static data ───────────────────────────────────────────────────────────────
 
-app.get('/api/model-info', async (_req, res) => {
-  try {
-    const r = await fetch(`${ML_URL}/model/info`);
-    const data = await r.json();
-    return res.json({ ok: true, ...data });
-  } catch (e) {
-    return res.status(500).json({ ok: false, error: String(e) });
-  }
-});
-
-app.get('/api/markets/snapshot', async (_req, res) => {
-  const markets = await getMarketSnapshot();
-  return res.json({ ok: true, markets });
-});
-
-// Demo cases: 3 named feature vectors for one-click simulation
 const DEMO_CASES = [
   {
     name: 'High-Risk Trade',
@@ -63,91 +70,112 @@ const DEMO_CASES = [
   }
 ];
 
+// ── Routes ────────────────────────────────────────────────────────────────────
+
+app.get('/health', (_req, res) => res.json({ ok: true, service: 'backend', ts: new Date().toISOString() }));
+
+// GET /api/system/status — composite health check
+app.get('/api/system/status', async (_req, res) => {
+  let ml_ok = false;
+  let ml_notes = null;
+  try {
+    const r = await mlFetch('/health');
+    const d = await r.json();
+    ml_ok = d?.ok === true;
+  } catch (e) {
+    ml_notes = e.message;
+  }
+  return res.json({
+    ok: true,
+    backend_ok: true,
+    ml_ok,
+    ws_enabled: false,
+    timestamp: new Date().toISOString(),
+    ...(ml_notes ? { notes: ml_notes } : {})
+  });
+});
+
+// GET /api/demo-cases
 app.get('/api/demo-cases', (_req, res) => {
   return res.json({ ok: true, cases: DEMO_CASES });
 });
 
+// GET /api/model-info — proxy to ML /model/info with timeout
+app.get('/api/model-info', async (_req, res) => {
+  try {
+    const r = await mlFetch('/model/info');
+    const data = await r.json();
+    return res.json({ ok: true, ...data });
+  } catch (e) {
+    return res.status(502).json(errBody(e.message, 'GET /model/info'));
+  }
+});
+
+// GET /api/simulate — proxy to ML /simulate with timeout
 app.get('/api/simulate', async (_req, res) => {
   try {
-    const r = await fetch(`${ML_URL}/simulate`);
+    const r = await mlFetch('/simulate');
     const data = await r.json();
     return res.json({ ok: true, ...data });
   } catch (e) {
-    return res.status(500).json({ ok: false, error: String(e) });
+    return res.status(502).json(errBody(e.message, 'GET /simulate'));
   }
 });
 
+// POST /api/infer — validate + proxy to ML /infer with timeout
 app.post('/api/infer', async (req, res) => {
-  // --- Input validation ---
   const { features } = req.body || {};
-  if (!features) {
-    return res.status(400).json({ ok: false, error: '"features" field is required.' });
+  const validationError = validateFeatures(features);
+  if (validationError) {
+    return res.status(400).json(errBody(validationError, 'input validation'));
   }
-  if (!Array.isArray(features)) {
-    return res.status(400).json({ ok: false, error: '"features" must be an array.' });
-  }
-  if (features.length < 1 || features.length > 64) {
-    return res.status(400).json({ ok: false, error: `"features" length must be between 1 and 64 (got ${features.length}).` });
-  }
-  if (!features.every(v => typeof v === 'number' && isFinite(v))) {
-    return res.status(400).json({ ok: false, error: '"features" must contain only finite numeric values.' });
-  }
-  // --- Forward to ML service ---
   try {
-    const err = validPayload(req.body);
-    if (err) return res.status(400).json({ ok: false, error: err });
-    const payload = { features: req.body.features.map((x) => Number(x)) };
-    const r = await fetch(`${ML_URL}/infer`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+    const r = await mlFetch('/infer', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ features })
     });
     const data = await r.json();
-    if (!r.ok) return res.status(r.status).json({ ok: false, ...data });
     return res.json({ ok: true, ...data });
   } catch (e) {
-    return res.status(500).json({ ok: false, error: String(e) });
+    return res.status(502).json(errBody(e.message, 'POST /infer'));
   }
 });
 
+// POST /api/ensemble — run all demo cases through ML and return batch results
 app.post('/api/ensemble', async (req, res) => {
+  // Accept optional override features, otherwise run all 3 demo cases
+  const { features } = req.body || {};
+  const cases = features
+    ? [{ name: 'Custom', features }]
+    : DEMO_CASES;
+
+  if (features) {
+    const validationError = validateFeatures(features);
+    if (validationError) {
+      return res.status(400).json(errBody(validationError, 'input validation'));
+    }
+  }
+
   try {
-    const err = validPayload(req.body);
-    if (err) return res.status(400).json({ ok: false, error: err });
-
-    const inferResp = await fetch(`${ML_URL}/infer`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ features: req.body.features })
-    });
-    const anomaly = await inferResp.json();
-
-    const markets = await getMarketSnapshot();
-    const regime = inferRegime(markets);
-    const ensemble = runEnsemble({ anomaly, regime });
-
-    return res.json({ ok: true, markets, ...ensemble });
+    const results = await Promise.all(
+      cases.map(async (c) => {
+        const r = await mlFetch('/infer', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ features: c.features })
+        });
+        const data = await r.json();
+        return { name: c.name, ...data };
+      })
+    );
+    return res.json({ ok: true, results, ts: new Date().toISOString() });
   } catch (e) {
-    return res.status(500).json({ ok: false, error: String(e) });
+    return res.status(502).json(errBody(e.message, 'POST /ensemble'));
   }
 });
 
-app.post('/api/scenario/run', async (req, res) => {
-  const scenario = req.body?.scenario || 'volatility-spike';
-  const markets = await getMarketSnapshot();
-  const shock = scenario === 'rate-hike' ? 1.15 : scenario === 'liquidity-crunch' ? 1.25 : 1.35;
-  const stressed = markets.map((m) => ({ ...m, changePct: +(m.changePct * shock).toFixed(2) }));
-  const regime = inferRegime(stressed);
-  return res.json({ ok: true, scenario, before: markets, after: stressed, regime });
-});
-
-const server = createServer(app);
-const wss = new WebSocketServer({ server, path: '/ws/signals' });
-
-wss.on('connection', (ws) => {
-  const timer = setInterval(async () => {
-    const markets = await getMarketSnapshot();
-    const regime = inferRegime(markets);
-    ws.send(JSON.stringify({ type: 'tick', markets, regime, ts: new Date().toISOString() }));
-  }, 2000);
-  ws.on('close', () => clearInterval(timer));
-});
+// ── Start ─────────────────────────────────────────────────────────────────────
 
 const port = process.env.PORT || 4000;
-server.listen(port, () => console.log(`backend+ws listening on :${port}`));
+app.listen(port, () => console.log(`backend listening on :${port}`));

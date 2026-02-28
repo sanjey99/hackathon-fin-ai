@@ -14,13 +14,9 @@ Then open:
 - Frontend: http://localhost:5173
 - Backend health: http://localhost:4000/health
 - ML health: http://localhost:8000/health
-- WebSocket stream: ws://localhost:4000/ws/signals
 
-## Test endpoints quickly
+## Test inference quickly
 ```bash
-curl -s http://localhost:4000/api/demo-cases
-curl -s http://localhost:4000/api/model-info
-curl -s http://localhost:4000/api/simulate
 curl -s -X POST http://localhost:4000/api/infer \
   -H 'Content-Type: application/json' \
   -d '{"features":[0.1,0.4,0.2,0.3,0.8,0.2,0.5,0.9]}'
@@ -75,9 +71,75 @@ npm install
 ML_URL=http://localhost:8000 npm run dev
 ```
 
-### Start frontend (Vite)
+## P-003 — Backend reliability hardening
+
+### Standard error shape
+All error responses now follow this contract:
+```json
+{ "ok": false, "error": "<human-readable string>", "context": "<endpoint hint>", "ts": "<ISO-8601 UTC>" }
+```
+- Validation failures → **HTTP 400**
+- ML upstream failures (timeout / unreachable) → **HTTP 502**
+
+### System status check
 ```bash
-cd frontend
-npm install
-VITE_API_URL=http://localhost:4000 npm run dev
+curl -s http://localhost:4000/api/system/status | python3 -m json.tool
+# Expected:
+# {
+#   "ok": true,
+#   "backend_ok": true,
+#   "ml_ok": true,
+#   "ws_enabled": false,
+#   "timestamp": "2026-...",
+#   "notes": "<present only when ML is down>"
+# }
+```
+
+### Model info via backend proxy
+```bash
+curl -s http://localhost:4000/api/model-info | python3 -m json.tool
+# Returns: model_type, input_dim, threshold, model_loaded
+```
+
+### Ensemble endpoint (runs all 3 demo cases)
+```bash
+curl -s -X POST http://localhost:4000/api/ensemble \
+  -H 'Content-Type: application/json' \
+  -d '{}' | python3 -m json.tool
+# Returns: { ok, results: [{name, risk_score, label, ...}, ...], ts }
+
+# Or override with custom features:
+curl -s -X POST http://localhost:4000/api/ensemble \
+  -H 'Content-Type: application/json' \
+  -d '{"features":[0.9,0.8,0.7,0.6,0.5,0.4,0.3,0.2]}' | python3 -m json.tool
+```
+
+### Quick failure tests
+
+**Bad payload → 400 with standard error shape:**
+```bash
+curl -s -X POST http://localhost:4000/api/infer \
+  -H 'Content-Type: application/json' \
+  -d '{"features":"not-an-array"}' | python3 -m json.tool
+# { "ok": false, "error": "...", "context": "input validation", "ts": "..." }
+
+curl -s -X POST http://localhost:4000/api/infer \
+  -H 'Content-Type: application/json' \
+  -d '{}' | python3 -m json.tool
+# { "ok": false, "error": "\"features\" field is required.", "context": "input validation", "ts": "..." }
+```
+
+**ML timeout simulation (stop ML service, then call infer):**
+```bash
+# After stopping ML service:
+curl -s -X POST http://localhost:4000/api/infer \
+  -H 'Content-Type: application/json' \
+  -d '{"features":[0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8]}'
+# Returns HTTP 502: { "ok": false, "error": "ML service timed out after 8000ms (/infer)", ... }
+```
+
+**System status when ML is down:**
+```bash
+curl -s http://localhost:4000/api/system/status | python3 -m json.tool
+# ml_ok will be false, notes will explain why
 ```
