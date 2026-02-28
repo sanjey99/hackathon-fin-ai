@@ -34,6 +34,28 @@ Proposed next action:
 
 ## Live Log
 
+### Cycle Timestamp (UTC): 2026-03-01T18:45:00Z
+Status: DONE
+Packet ID: P-PORT1
+
+Completed:
+- Ticker input now has auto-suggest dropdown (24 tickers from TICKER_UNIVERSE) with name matching
+- Input validation: format check, duplicate check, max 15 assets, inline error display
+- Objective selector: MAX SHARPE / MIN RISK / MAX RETURN with icons and descriptions
+- Optimizer now generates objective-specific weights, metrics, and frontier curves
+- Efficient frontier + scatter points update dynamically after each optimization
+- Allocation map blocks are clickable → opens detail drawer (weight, share, color, Yahoo Finance link)
+- All four key metrics now have info tooltip icons explaining Sharpe, VaR, Max Drawdown, Expected Return
+- "Why this recommendation?" section appears after optimization with plain-language explanation per objective
+
+Files changed:
+- frontend/src/app/components/fin/Portfolio.tsx — auto-suggest, objective selector, detail drawer, metric tooltips, dynamic frontier, why section
+
+Commits:
+- P-PORT1: interactive portfolio drill-down, validation, and explainability pass
+
+---
+
 ### Cycle Timestamp (UTC): 2026-03-01T18:30:00Z
 Status: DONE
 Packet ID: P-LIVE1
