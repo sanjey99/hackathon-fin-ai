@@ -121,6 +121,39 @@ npx vite preview --port 5173
 - Shows: API base URL, health status indicator (green/yellow/red), last updated timestamp
 - Deploy-ready marker: Green badge reading "FRONTEND DEPLOY-READY"
 
+---
+
+## API Base URL Configuration
+
+| Service   | Env Variable         | Default                  | Used By    |
+|-----------|---------------------|--------------------------|------------|
+| Backend   | `ML_URL`            | `http://ml:8000`         | Backend → ML calls |
+| Frontend  | (hardcoded in App.jsx) | `http://localhost:4000` | Browser → Backend |
+| Frontend  | `VITE_API_URL`      | `http://localhost:4000`  | Vite build (if used) |
+
+**To change the backend API URL at deploy time** (e.g. behind a reverse proxy):
+- For the CDN-served `index.html`/`App.jsx`: edit the `const API = '...'` line in `frontend/src/App.jsx`.
+- For the Docker backend: set `ML_URL` in `docker-compose.yml` or as an environment variable.
+
+---
+
+## Demo Day Checklist
+
+Before the demo, verify in order:
+
+1. **Services running**: `docker compose up --build -d` — all 3 containers healthy
+2. **Backend health**: `curl http://localhost:4000/health` → `{"status":"ok"}`
+3. **ML health**: `curl http://localhost:8000/health` → `{"status":"ok"}`
+4. **Open browser**: http://localhost:5173
+5. **Portfolio tab** (default): Click a Preset → Run Optimisation → see KPI cards + weights
+6. **Stock Picker tab**: Verify picks load, countdown timer visible, click Refresh
+7. **Fraud tab**: Click "Load Sample" → "Scan for Fraud" → see account alert + transactions
+8. **Risk Score tab**: Click "Run Model" → see risk output
+9. **Footer**: Confirm "Hackathon build – deploy ready" marker visible
+10. **Error handling**: Stop ML container → retry an action → confirm error banner (no blank screen)
+
+---
+
 ### Quick Smoke Test Script
 ```bash
 # Start all services

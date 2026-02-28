@@ -34,6 +34,33 @@ Proposed next action:
 
 ## Live Log
 
+### Cycle Timestamp (UTC): 2026-03-01T12:15:00Z
+Status: DONE
+Packet ID: P-D1
+
+Completed:
+- Frontend build passes: `cd frontend && npm install && npm run build` exits 0, produces dist/index.html
+- API base URL env handling documented in RUNBOOK (ML_URL, VITE_API_URL, hardcoded App.jsx const)
+- Demo Day Checklist added to RUNBOOK (10-step pre-demo verification)
+- Known Limitations section added to README (9 items: synthetic data, no persistence, no auth, Babel CDN, hardcoded URLs, deterministic scores, heuristic fraud, single-user, no HTTPS)
+- Deploy Steps section added to README (clone, docker compose, verify, open)
+- Footer marker "Hackathon build – deploy ready" already present in App.jsx from P-H2
+
+Acceptance:
+- [x] Build passes (exit 0)
+- [x] Docs sufficient for teammate setup
+- [x] Deploy marker visible in footer
+
+Files changed:
+- docs/RUNBOOK.md — added API Base URL Configuration + Demo Day Checklist sections
+- README.md — added Deploy Steps + Known Limitations sections
+- COPILOT_OUTBOX.md — this update
+
+Commits:
+- P-D1: Deploy-ready polish — build verified, docs updated, known limitations
+
+---
+
 ### Cycle Timestamp (UTC): 2026-03-01T12:00:00Z
 Status: DONE
 Packet ID: P-Q1
