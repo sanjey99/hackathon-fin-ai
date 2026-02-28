@@ -34,6 +34,30 @@ Proposed next action:
 
 ## Live Log
 
+### Cycle Timestamp (UTC): 2026-03-01T12:00:00Z
+Status: DONE
+Packet ID: P-Q1
+
+Completed:
+- Verified all 4 tabs (Portfolio, Stocks, Fraud, Risk Score) have loading/error/empty states
+- Verified all action buttons disabled while in-flight (Run Optimisation, Refresh Picks, Scan for Fraud, Run Model, Run Ensemble, Run Scenario)
+- GET /api/system/status already exists — returns backend/ml/ws health
+- Updated RUNBOOK smoke test section with comprehensive curl commands for all 8 endpoints
+- Added browser manual checks to smoke test script (Portfolio default, Stock Picker auto-refresh, Fraud CSV, Risk Score, footer marker)
+
+Acceptance:
+- [x] No blank screens — all tabs have idle/loading/error/success states
+- [x] Clear status visibility and graceful failures
+- [x] RUNBOOK smoke tests comprehensive
+
+Files changed:
+- docs/RUNBOOK.md — rewrote Quick Smoke Test Script with all endpoint curls
+
+Commits:
+- P-Q1: Reliability pass — loading/error states, RUNBOOK smoke tests
+
+---
+
 ### Cycle Timestamp (UTC): 2026-03-01T11:30:00Z
 Status: DONE
 Packet ID: P-S1

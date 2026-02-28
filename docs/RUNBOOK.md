@@ -18,12 +18,37 @@ Then open:
 
 ## Test endpoints quickly
 ```bash
+# Health checks
+curl -s http://localhost:4000/health
+curl -s http://localhost:8000/health
+curl -s http://localhost:4000/api/system/status
+
+# Demo cases
 curl -s http://localhost:4000/api/demo-cases
+
+# Model info
 curl -s http://localhost:4000/api/model-info
+
+# Simulate
 curl -s http://localhost:4000/api/simulate
+
+# Run inference
 curl -s -X POST http://localhost:4000/api/infer \
   -H 'Content-Type: application/json' \
   -d '{"features":[0.1,0.4,0.2,0.3,0.8,0.2,0.5,0.9]}'
+
+# Portfolio optimisation
+curl -s -X POST http://localhost:4000/api/portfolio/optimize \
+  -H 'Content-Type: application/json' \
+  -d '{"assets":[{"symbol":"AAPL","weight":0.4},{"symbol":"MSFT","weight":0.3},{"symbol":"NVDA","weight":0.3}],"simulations":500,"horizon_days":30}'
+
+# Stock picker
+curl -s http://localhost:4000/api/stocks/picker
+
+# Fraud scan
+curl -s -X POST http://localhost:4000/api/fraud/scan \
+  -H 'Content-Type: application/json' \
+  -d '{"rows":[{"amount":150,"merchant":"Amazon","category":"retail","hour":14,"is_foreign":false},{"amount":8500,"merchant":"Unknown","category":"wire_transfer","hour":3,"is_foreign":true},{"amount":12000,"merchant":"Offshore LLC","category":"cash_advance","hour":1,"is_foreign":true}]}'
 ```
 
 ## Fallback (no Docker)
@@ -113,12 +138,35 @@ curl -sf http://localhost:4000/health && echo "✅ Backend healthy" || echo "❌
 # 3. Verify ML health
 curl -sf http://localhost:8000/health && echo "✅ ML healthy" || echo "❌ ML unhealthy"
 
-# 4. Verify simulate endpoint (used by demo mode)
-curl -sf http://localhost:4000/api/simulate && echo "✅ Simulate endpoint OK" || echo "❌ Simulate failed"
+# 4. System status
+curl -sf http://localhost:4000/api/system/status && echo "✅ System status OK" || echo "❌ System status failed"
 
-# 5. Open browser and check:
-#    - No blank screens
-#    - Footer shows "FRONTEND DEPLOY-READY"
-#    - Demo Mode toggle visible top-right
-#    - Each tab renders without errors
+# 5. Portfolio optimisation
+curl -sf -X POST http://localhost:4000/api/portfolio/optimize \
+  -H 'Content-Type: application/json' \
+  -d '{"assets":[{"symbol":"AAPL","weight":0.5},{"symbol":"MSFT","weight":0.5}],"simulations":100}' \
+  | grep -q "var_95" && echo "✅ Portfolio optimize OK" || echo "❌ Portfolio optimize failed"
+
+# 6. Stock picker
+curl -sf http://localhost:4000/api/stocks/picker | grep -q "picks" && echo "✅ Stock picker OK" || echo "❌ Stock picker failed"
+
+# 7. Fraud scan
+curl -sf -X POST http://localhost:4000/api/fraud/scan \
+  -H 'Content-Type: application/json' \
+  -d '{"rows":[{"amount":8500,"merchant":"Unknown","category":"wire_transfer","hour":3,"is_foreign":true}]}' \
+  | grep -q "account_alert" && echo "✅ Fraud scan OK" || echo "❌ Fraud scan failed"
+
+# 8. Inference
+curl -sf -X POST http://localhost:4000/api/infer \
+  -H 'Content-Type: application/json' \
+  -d '{"features":[0.1,0.4,0.2,0.3,0.8,0.2,0.5,0.9]}' \
+  | grep -q "risk_score" && echo "✅ Inference OK" || echo "❌ Inference failed"
+
+# 9. Open browser and check:
+#    - Portfolio tab is default landing
+#    - Stock Picker tab loads with auto-refresh countdown
+#    - Fraud tab: paste CSV + scan works
+#    - Risk Score tab: ensemble + scenario buttons work
+#    - Footer shows "Hackathon build – deploy ready"
+#    - No blank screens on any tab
 ```
