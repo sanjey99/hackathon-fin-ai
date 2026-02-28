@@ -1,15 +1,101 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>FinSentinel Terminal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body, #root { height: 100%; }
+    body { background: #070b12; color: #dce8ff; font-family: 'Inter', Arial, sans-serif; font-size: 14px; line-height: 1.55; }
 
-  <!DOCTYPE html>
-  <html lang="en">
-    <head>
-      <meta charset="UTF-8" />
-      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-      <title>Creative platform design</title>
-    </head>
+    .layout { display: grid; grid-template-columns: 220px 1fr 320px; gap: 0; height: 100vh; overflow: hidden; }
+    .col-left   { background: #0a0f1c; border-right: 1px solid #182035; padding: 20px 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; }
+    .col-centre { background: #070b12; border-right: 1px solid #182035; padding: 20px 20px; overflow-y: auto; }
+    .col-right  { background: #0a0f1c; padding: 20px 18px; overflow-y: auto; }
 
-    <body>
-      <div id="root"></div>
-      <script type="module" src="/src/main.tsx"></script>
-    </body>
-  </html>
-  
+    .brand { padding-bottom: 14px; border-bottom: 1px solid #182035; }
+    .brand-name { display: block; font-size: 18px; font-weight: 700; color: #60a5fa; letter-spacing: .5px; }
+    .brand-tag  { display: block; font-size: 11px; color: #5a7298; text-transform: uppercase; letter-spacing: 1px; margin-top: 2px; }
+
+    .status-bar { display: flex; gap: 10px; flex-wrap: wrap; }
+    .status-dot { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 500; }
+    .status-dot .dot { width: 7px; height: 7px; border-radius: 50%; }
+    .status-dot.ok  .dot { background: #22c55e; box-shadow: 0 0 6px #22c55e88; }
+    .status-dot.err .dot { background: #ef4444; box-shadow: 0 0 6px #ef444488; }
+    .status-dot.ok  { color: #86efac; }
+    .status-dot.err { color: #fca5a5; }
+
+    .section-heading { font-size: 10px; font-weight: 600; color: #4a6080; text-transform: uppercase; letter-spacing: 1.2px; margin-bottom: 8px; }
+
+    .case-select { width: 100%; background: #0f182c; border: 1px solid #253351; border-radius: 8px; color: #dce8ff; padding: 8px 10px; font-size: 13px; font-family: inherit; cursor: pointer; outline: none; }
+    .case-select:focus { border-color: #60a5fa; }
+    .case-desc { font-size: 12px; color: #5a7298; margin-top: 6px; line-height: 1.45; }
+    .hint { font-size: 11px; color: #3d5070; margin-bottom: 4px; }
+
+    .cta-group { display: flex; flex-direction: column; gap: 9px; }
+    .btn-primary, .btn-secondary { border: none; border-radius: 8px; padding: 11px 14px; font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer; transition: opacity .15s, transform .1s; text-align: center; }
+    .btn-primary   { background: #2563eb; color: #fff; }
+    .btn-secondary { background: #162033; color: #93c5fd; border: 1px solid #253351; }
+    .btn-primary:hover   { opacity: .88; }
+    .btn-secondary:hover { background: #1e2d45; }
+    .btn-primary:active, .btn-secondary:active { transform: scale(.97); }
+    .btn-primary:disabled, .btn-secondary:disabled { opacity: .4; cursor: not-allowed; }
+
+    .feat-input { width: 100%; background: #0f182c; border: 1px solid #253351; border-radius: 6px; color: #93c5fd; font-family: 'Menlo', monospace; font-size: 11px; padding: 7px 8px; resize: vertical; margin-top: 6px; }
+
+    .kpi-strip { display: flex; flex-wrap: wrap; gap: 10px; }
+    .kpi-chip  { background: #0c1524; border: 1px solid #1e2e47; border-radius: 8px; padding: 10px 14px; min-width: 90px; display: flex; flex-direction: column; gap: 3px; }
+    .kpi-label { font-size: 10px; color: #4a6080; font-weight: 600; text-transform: uppercase; letter-spacing: .8px; }
+    .kpi-value { font-size: 18px; font-weight: 700; color: #dce8ff; }
+    .kpi-value.green { color: #4ade80; }
+    .kpi-value.red   { color: #f87171; }
+
+    .market-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .market-table th { text-align: left; font-size: 10px; font-weight: 600; color: #4a6080; text-transform: uppercase; letter-spacing: .8px; padding: 6px 10px; border-bottom: 1px solid #182035; }
+    .market-table td { padding: 9px 10px; border-bottom: 1px solid #0f1928; }
+    .market-table tr:last-child td { border-bottom: none; }
+    .market-table tr:hover td { background: #0c1524; }
+    .market-table .idx  { color: #4a6080; font-weight: 600; width: 28px; }
+    .market-table .name { color: #93c5fd; font-weight: 600; }
+    .market-table .desc { color: #7a9abf; }
+    .market-table .vecs { color: #60a5fa; font-weight: 700; width: 44px; text-align: right; }
+
+    .decision-panel { border-radius: 10px; padding: 18px; border: 1px solid #182035; background: #0c1524; margin-top: 4px; }
+    .decision-panel.loading, .decision-panel.empty { color: #4a6080; font-style: italic; padding: 28px; text-align: center; }
+    .decision-panel.anomaly { border-color: #7f1d1d; background: #12090c; }
+    .decision-panel.normal  { border-color: #14532d; background: #09120d; }
+
+    .decision-label { font-size: 20px; font-weight: 700; margin-bottom: 16px; letter-spacing: .5px; }
+    .decision-panel.anomaly .decision-label { color: #f87171; }
+    .decision-panel.normal  .decision-label { color: #4ade80; }
+
+    .decision-row { display: flex; justify-content: space-between; align-items: flex-start; padding: 8px 0; border-bottom: 1px solid #182035; font-size: 13px; gap: 10px; }
+    .decision-row.col { flex-direction: column; gap: 5px; }
+    .decision-row:last-of-type { border-bottom: none; }
+    .dr-key   { color: #4a6080; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .8px; white-space: nowrap; padding-top: 1px; }
+    .dr-val   { color: #dce8ff; font-weight: 600; text-align: right; }
+    .dr-val.green { color: #4ade80; }
+    .dr-val.red   { color: #f87171; }
+    .dr-val.rec   { color: #93c5fd; font-size: 12px; }
+    .dr-reason { font-size: 12px; color: #7a9abf; line-height: 1.5; }
+
+    .advanced { margin-top: 14px; }
+    .advanced summary { font-size: 11px; color: #4a6080; cursor: pointer; user-select: none; padding: 4px 0; letter-spacing: .5px; }
+    .advanced summary:hover { color: #93c5fd; }
+    .adv-pre { margin-top: 8px; font-family: 'Menlo', monospace; font-size: 11px; color: #5a7298; background: #070b12; border: 1px solid #182035; border-radius: 6px; padding: 10px; white-space: pre-wrap; overflow-x: auto; }
+
+    .err-banner { background: #3b0a0a; border: 1px solid #7f1d1d; color: #fca5a5; border-radius: 7px; padding: 10px 13px; font-size: 12px; margin-bottom: 12px; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script type="text/babel" src="src/App.jsx" data-type="module"></script>
+</body>
+</html>
