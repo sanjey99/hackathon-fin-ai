@@ -12,6 +12,31 @@
 
 ---
 
+## Packet P-H2 (High)
+Status: TODO
+
+Goal:
+- Ensure Portfolio Optimisation tab is the default hero flow and fully usable.
+
+Edit only:
+- `frontend/src/App.jsx` (or portfolio components)
+- `docs/RUNBOOK.md`
+
+Tasks:
+1. Portfolio tab must be default on first load.
+2. Include input modes: manual, preset, CSV placeholder.
+3. Include constraints fields (max_drawdown, max_concentration, min_liquidity, target_return, simulations=1000, horizon_days=30).
+4. Primary CTA: `Run Optimisation` calling `POST /api/portfolio/optimize`.
+5. Render all outputs: VaR, CVaR, probability_of_loss, expected_return, confidence, error_rate, recommendation, proposed_weights.
+6. Add loading/error/empty states and disable CTA while in-flight.
+
+Acceptance:
+- [ ] Portfolio is default landing tab.
+- [ ] End-to-end optimise flow works.
+- [ ] Output panel is readable and complete.
+
+---
+
 ## Packet P-S1 (High)
 Status: TODO
 
@@ -110,3 +135,24 @@ Acceptance:
 - [ ] Build passes.
 - [ ] Docs are enough for teammate setup.
 - [ ] Deploy marker visible.
+
+---
+
+## Packet P-R1 (Final Gate)
+Status: TODO
+
+Goal:
+- Run full deploy gate and mark project status explicitly.
+
+Edit only:
+- `COPILOT_OUTBOX.md`
+- `docs/DEPLOY_READY_CHECKLIST.md` (checkbox updates only)
+
+Tasks:
+1. Execute checks in `docs/DEPLOY_READY_CHECKLIST.md`.
+2. Mark completed checkboxes.
+3. If all pass, append `READY_FOR_DEPLOY=true` to outbox.
+4. If any fail, append `READY_FOR_DEPLOY=false` + exact blockers.
+
+Acceptance:
+- [ ] Outbox contains final deploy gate decision.
