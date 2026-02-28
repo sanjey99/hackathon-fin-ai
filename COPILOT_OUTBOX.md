@@ -130,3 +130,36 @@ Questions for Jarvis:
 
 Proposed next action:
 - Awaiting Jarvis next packet (P-003 or P-004).
+
+---
+
+### Cycle Timestamp (UTC): 2026-03-01T02:00:00Z
+Status: DONE
+Packet ID: P-003
+
+Completed:
+- [x] **Standardized error shape** across all endpoints: `{ ok:false, error:<string>, context?:<string>, ts:<ISO-8601> }`. Extracted `errBody(error, context)` helper used by every error return path.
+- [x] **8s timeout wrapper** (`mlFetch(path, opts)`) using `AbortController` applied to all ML upstream calls: `/api/infer`, `/api/simulate`, `/api/model-info`, `/api/ensemble`. Timeout produces HTTP 502 with a readable `"ML service timed out after 8000ms"` message (not a 500 crash).
+- [x] **`GET /api/system/status`** added — returns `{ ok, backend_ok, ml_ok, ws_enabled, timestamp, notes? }`. Probes ML `/health` with the same timeout wrapper; `ml_ok:false` + `notes` on failure instead of erroring out.
+- [x] **`GET /api/model-info`** added — backend proxy to ML `/model/info` with timeout; returns `{ ok, model_type, input_dim, threshold, model_loaded }`.
+- [x] **`POST /api/ensemble`** added — runs all 3 demo cases (or a custom `features` override) through ML `/infer` concurrently via `Promise.all`; returns `{ ok, results:[...], ts }`. Full input validation (400) applied to override path.
+- [x] **All invalid payloads return 400** (never 500): `validateFeatures()` helper covers missing field, non-array, bad length, non-finite values — used by both `/api/infer` and `/api/ensemble`.
+- [x] **RUNBOOK updated** with: system status curl, standard error shape docs, model-info proxy, ensemble endpoint examples, quick failure tests (bad payload → 400, ML timeout → 502, system status when ML down).
+
+Files changed:
+- `backend/src/index.js` — full rewrite with `errBody`, `mlFetch`, `validateFeatures` helpers; new routes `/api/system/status`, `/api/model-info`, `/api/ensemble`; existing routes hardened.
+- `docs/RUNBOOK.md` — appended "P-003 — Backend reliability hardening" section.
+
+Checks run:
+- Static code review of `backend/src/index.js` — `errBody` used on every error path; `mlFetch` wraps every ML call; 400 returned for all validation failures; 502 returned for all upstream failures.
+- Confirmed no secrets/env files touched; `ML_URL` read from `process.env` as before.
+- RUNBOOK section reviewed — all curl examples match implemented endpoints and expected response shapes.
+
+Blockers:
+- None
+
+Questions for Jarvis:
+- Please mark P-003 DONE. Ready for P-004 (runbook hardening / demo verification script).
+
+Proposed next action:
+- Awaiting Jarvis next packet (P-004).
