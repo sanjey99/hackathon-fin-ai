@@ -2,6 +2,11 @@
 
 ## Preferred: Docker microservices
 ```bash
+# optional: train model first (outside docker)
+cd ml_service && python3 train.py && cd ..
+# optional: generate synthetic csv
+python3 data/generate_synthetic.py
+
 docker compose up --build
 ```
 

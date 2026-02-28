@@ -8,18 +8,22 @@
       body{background:#070b12;color:#eaf1ff;font-family:Inter,Arial,sans-serif;max-width:980px;margin:24px auto;padding:0 16px}
       .card{border:1px solid rgba(255,255,255,.15);border-radius:12px;padding:16px;margin-top:12px;background:#0c1220}
       input,button{padding:8px 10px;border-radius:8px;border:1px solid #24324a;background:#0f182c;color:#eaf1ff}
-      button{cursor:pointer}
+      button{cursor:pointer;margin-right:8px}
       pre{white-space:pre-wrap}
+      .badge{display:inline-block;padding:4px 8px;border-radius:999px;background:#13243b;border:1px solid #2d4565;font-size:12px;color:#b8d6ff}
     </style>
   </head>
   <body>
     <h1>FinSentinel — Finance Intelligence Copilot</h1>
-    <p>One-flow demo: features -> AI inference -> confidence + recommendation.</p>
+    <p><span class="badge">Finance Track</span> <span class="badge">Deep Learning</span> <span class="badge">Microservices</span></p>
 
     <div class="card">
       <label>Input features (comma-separated): </label>
-      <input id="f" value="0.1,0.4,0.2,0.3,0.8,0.2,0.5,0.9" size="50" />
-      <button onclick="runInfer()">Run Inference</button>
+      <input id="f" value="0.1,0.4,0.2,0.3,0.8,0.2,0.5,0.9" size="52" />
+      <div style="margin-top:10px">
+        <button onclick="runInfer()">Run Inference</button>
+        <button onclick="runSimulate()">Run Simulated Case</button>
+      </div>
     </div>
 
     <div class="card">
@@ -28,17 +32,23 @@
     </div>
 
     <script>
+      const out=document.getElementById('out');
       async function runInfer(){
         const arr=(document.getElementById('f').value||'').split(',').map(x=>Number(x.trim())).filter(x=>!Number.isNaN(x));
-        const out=document.getElementById('out');
-        out.textContent='running...';
+        out.textContent='running /api/infer ...';
         try{
           const r=await fetch('http://localhost:4000/api/infer',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({features:arr})});
           const d=await r.json();
           out.textContent=JSON.stringify(d,null,2);
-        }catch(e){
-          out.textContent='error: '+e;
-        }
+        }catch(e){ out.textContent='error: '+e; }
+      }
+      async function runSimulate(){
+        out.textContent='running /api/simulate ...';
+        try{
+          const r=await fetch('http://localhost:4000/api/simulate');
+          const d=await r.json();
+          out.textContent=JSON.stringify(d,null,2);
+        }catch(e){ out.textContent='error: '+e; }
       }
     </script>
   </body>

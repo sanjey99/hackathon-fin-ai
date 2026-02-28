@@ -3,6 +3,7 @@ from pydantic import BaseModel
 import numpy as np
 import torch
 import torch.nn as nn
+from pathlib import Path
 
 app = FastAPI(title='FinSentinel ML Service')
 
@@ -20,12 +21,28 @@ class TinyMLP(nn.Module):
     def forward(self, x):
         return self.net(x)
 
+MODEL_PATH = Path(__file__).resolve().parent / 'model.pt'
 model = TinyMLP(dim=8)
+if MODEL_PATH.exists():
+    model.load_state_dict(torch.load(MODEL_PATH, map_location='cpu'))
 model.eval()
 
 @app.get('/health')
 def health():
     return {'ok': True, 'service': 'ml'}
+
+@app.get('/simulate')
+def simulate():
+    sample = np.array([0.95, 0.72, -0.18, 0.41, 0.07, 1.01, 0.15, 0.32], dtype=np.float32)
+    x = torch.tensor(sample).unsqueeze(0)
+    with torch.no_grad():
+        score = float(model(x).item())
+    return {
+        'features': sample.tolist(),
+        'risk_score': round(score, 4),
+        'label': 'anomaly' if score > 0.65 else 'normal'
+    }
+
 
 @app.post('/infer')
 def infer(inp: InferIn):

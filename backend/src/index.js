@@ -9,6 +9,16 @@ app.use(express.json());
 
 app.get('/health', (_req, res) => res.json({ ok: true, service: 'backend' }));
 
+app.get('/api/simulate', async (_req, res) => {
+  try {
+    const r = await fetch(`${process.env.ML_URL || 'http://localhost:8000'}/simulate`);
+    const data = await r.json();
+    return res.json({ ok: true, ...data });
+  } catch (e) {
+    return res.status(500).json({ ok: false, error: String(e) });
+  }
+});
+
 app.post('/api/infer', async (req, res) => {
   try {
     const payload = req.body;
