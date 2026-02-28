@@ -44,6 +44,29 @@ app.get('/api/markets/snapshot', async (_req, res) => {
   return res.json({ ok: true, markets });
 });
 
+// Demo cases: 3 named feature vectors for one-click simulation
+const DEMO_CASES = [
+  {
+    name: 'High-Risk Trade',
+    description: 'Unusual volume spike with correlated anomaly signals',
+    features: [0.95, 0.72, -0.18, 0.41, 0.07, 1.01, 0.15, 0.32]
+  },
+  {
+    name: 'Normal Transaction',
+    description: 'Routine low-volatility market activity',
+    features: [0.10, 0.20, 0.05, 0.15, 0.30, 0.12, 0.08, 0.25]
+  },
+  {
+    name: 'Borderline Case',
+    description: 'Mid-range signals requiring closer monitoring',
+    features: [0.60, 0.55, 0.40, 0.50, 0.48, 0.62, 0.45, 0.58]
+  }
+];
+
+app.get('/api/demo-cases', (_req, res) => {
+  return res.json({ ok: true, cases: DEMO_CASES });
+});
+
 app.get('/api/simulate', async (_req, res) => {
   try {
     const r = await fetch(`${ML_URL}/simulate`);
@@ -55,6 +78,21 @@ app.get('/api/simulate', async (_req, res) => {
 });
 
 app.post('/api/infer', async (req, res) => {
+  // --- Input validation ---
+  const { features } = req.body || {};
+  if (!features) {
+    return res.status(400).json({ ok: false, error: '"features" field is required.' });
+  }
+  if (!Array.isArray(features)) {
+    return res.status(400).json({ ok: false, error: '"features" must be an array.' });
+  }
+  if (features.length < 1 || features.length > 64) {
+    return res.status(400).json({ ok: false, error: `"features" length must be between 1 and 64 (got ${features.length}).` });
+  }
+  if (!features.every(v => typeof v === 'number' && isFinite(v))) {
+    return res.status(400).json({ ok: false, error: '"features" must contain only finite numeric values.' });
+  }
+  // --- Forward to ML service ---
   try {
     const err = validPayload(req.body);
     if (err) return res.status(400).json({ ok: false, error: err });
