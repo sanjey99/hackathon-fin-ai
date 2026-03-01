@@ -472,6 +472,123 @@ export function RiskScore({ demoMode = true }: { demoMode?: boolean }) {
                 </div>
               </div>
             </div>
+
+            {/* ── Market Regime Classification ─────────────────── */}
+            {(() => {
+              const regimes = [
+                { label: 'BULL', color: C.green, confidence: 0 },
+                { label: 'SIDEWAYS', color: C.yellow, confidence: 0 },
+                { label: 'BEAR', color: C.red, confidence: 0 },
+                { label: 'CRISIS', color: '#FF1744', confidence: 0 },
+              ];
+              // Deterministic regime based on score
+              const idx = output.score < 30 ? 0 : output.score < 55 ? 1 : output.score < 75 ? 2 : 3;
+              regimes[idx].confidence = 0.65 + (output.score % 20) / 100;
+              regimes[(idx + 1) % 4].confidence = 0.2;
+              regimes[(idx + 2) % 4].confidence = 0.1;
+              regimes[(idx + 3) % 4].confidence = 0.05;
+              const active = regimes[idx];
+              return (
+                <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 2, padding: 16, marginTop: 12 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                    <div style={{ width: 3, height: 12, background: active.color }} />
+                    <span style={{ fontFamily: C.mono, fontSize: 9, color: active.color, letterSpacing: '0.15em' }}>MARKET REGIME</span>
+                    <span style={{ fontFamily: C.mono, fontSize: 10, color: active.color, marginLeft: 'auto', letterSpacing: '0.1em' }}>{active.label}</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    {regimes.map(r => (
+                      <div key={r.label} style={{ flex: 1, textAlign: 'center' }}>
+                        <div style={{ height: 4, borderRadius: 2, background: `${r.color}30`, marginBottom: 4, position: 'relative', overflow: 'hidden' }}>
+                          <div style={{ width: `${r.confidence * 100}%`, height: '100%', background: r.color, borderRadius: 2, transition: 'width 0.4s' }} />
+                        </div>
+                        <span style={{ fontFamily: C.mono, fontSize: 7, color: r.confidence > 0.5 ? r.color : C.textDim }}>{r.label}</span>
+                        <div style={{ fontFamily: C.mono, fontSize: 8, color: C.textDim }}>{(r.confidence * 100).toFixed(0)}%</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* ── Stress Test Scenarios ────────────────────────── */}
+            <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 2, padding: 16, marginTop: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                <div style={{ width: 3, height: 12, background: C.red }} />
+                <span style={{ fontFamily: C.mono, fontSize: 9, color: C.red, letterSpacing: '0.15em' }}>STRESS SCENARIOS</span>
+              </div>
+              {[
+                { name: 'Rate Shock (+200bp)', impact: Math.min(100, output.score + 15), delta: '+15', desc: 'Fed hikes rates 200bp; floating-rate loans repriced, DTI spikes' },
+                { name: 'Vol Spike (VIX 40+)', impact: Math.min(100, output.score + 10), delta: '+10', desc: 'Equity volatility surge; collateral values drop, margin calls' },
+                { name: 'Sector Crash (−30%)', impact: Math.min(100, output.score + 22), delta: '+22', desc: `${industry} sector declines 30%; industry-specific contagion risk` },
+                { name: 'Corr Breakdown', impact: Math.min(100, output.score + 8), delta: '+8', desc: 'Diversification fails; all correlations move to 1.0' },
+              ].map((s, i) => {
+                const impactColor = s.impact >= 70 ? C.red : s.impact >= 40 ? C.yellow : C.green;
+                return (
+                  <div key={i} style={{ padding: '8px 0', borderBottom: i < 3 ? `1px solid ${C.border}` : 'none' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
+                      <span style={{ fontFamily: C.mono, fontSize: 9, color: C.text }}>{s.name}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontFamily: C.mono, fontSize: 9, color: C.red }}>{s.delta}</span>
+                        <span style={{ fontFamily: C.mono, fontSize: 10, color: impactColor, fontWeight: 700 }}>{s.impact}</span>
+                      </div>
+                    </div>
+                    <div style={{ height: 3, background: C.border, borderRadius: 1, marginBottom: 3 }}>
+                      <div style={{ width: `${s.impact}%`, height: '100%', background: impactColor, borderRadius: 1, transition: 'width 0.4s' }} />
+                    </div>
+                    <span style={{ fontFamily: C.sans, fontSize: 9, color: C.textDim }}>{s.desc}</span>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* ── Hedging Suggestions ─────────────────────────── */}
+            <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 2, padding: 16, marginTop: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                <div style={{ width: 3, height: 12, background: C.cyan }} />
+                <span style={{ fontFamily: C.mono, fontSize: 9, color: C.cyan, letterSpacing: '0.15em' }}>HEDGING / REBALANCE SUGGESTIONS</span>
+              </div>
+              {(() => {
+                const suggestions = output.score >= 70
+                  ? [
+                      { action: 'REDUCE EXPOSURE', detail: 'Cut position size by 20-30% or require additional collateral' },
+                      { action: 'ADD CDS PROTECTION', detail: 'Purchase credit default swap on sector basket' },
+                      { action: 'TIGHTEN COVENANTS', detail: 'Add DTI maintenance covenant with quarterly testing' },
+                    ]
+                  : output.score >= 40
+                  ? [
+                      { action: 'MONITOR CLOSELY', detail: 'Increase review frequency to weekly; set score alert at 70' },
+                      { action: 'PARTIAL HEDGE', detail: 'Consider put options on sector ETF for tail protection' },
+                    ]
+                  : [
+                      { action: 'STANDARD MONITORING', detail: 'Quarterly review cycle with existing covenants is sufficient' },
+                      { action: 'CONSIDER UPSIZING', detail: 'Risk profile supports potential exposure increase if warranted' },
+                    ];
+                return suggestions.map((s, i) => (
+                  <div key={i} style={{ display: 'flex', gap: 8, padding: '6px 0', borderBottom: i < suggestions.length - 1 ? `1px solid ${C.border}` : 'none' }}>
+                    <div style={{ width: 5, height: 5, borderRadius: '50%', background: C.cyan, marginTop: 4, flexShrink: 0 }} />
+                    <div>
+                      <div style={{ fontFamily: C.mono, fontSize: 9, color: C.cyan, letterSpacing: '0.08em' }}>{s.action}</div>
+                      <div style={{ fontFamily: C.sans, fontSize: 9, color: C.textDim, marginTop: 2 }}>{s.detail}</div>
+                    </div>
+                  </div>
+                ));
+              })()}
+            </div>
+
+            {/* ── Plain Language Interpretation ─────────────────── */}
+            <div style={{ background: C.bgCard, border: `1px solid ${scoreColor}20`, borderRadius: 2, padding: 16, marginTop: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <div style={{ width: 3, height: 12, background: C.orange }} />
+                <span style={{ fontFamily: C.mono, fontSize: 9, color: C.orange, letterSpacing: '0.15em' }}>PLAIN-LANGUAGE SUMMARY</span>
+              </div>
+              <p style={{ fontFamily: C.sans, fontSize: 11, color: C.text, lineHeight: 1.6, margin: 0 }}>
+                {output.score >= 70
+                  ? `This loan carries a ${tier.label} risk score of ${output.score}/100. The primary drivers are ${output.shap[0].factor.toLowerCase()} and ${output.shap[1].factor.toLowerCase()}. Under a sector crash scenario, the score could reach ${Math.min(100, output.score + 22)}, moving it into critical territory. We recommend reducing exposure and adding credit protection before approval.`
+                  : output.score >= 40
+                  ? `This borrower presents a ${tier.label} risk profile (${output.score}/100). Key factors are ${output.shap[0].factor.toLowerCase()} (${output.shap[0].value > 0 ? 'increases' : 'decreases'} risk) and ${output.shap[1].factor.toLowerCase()}. The loan is approvable with enhanced monitoring — set an escalation trigger at score 70 and review quarterly.`
+                  : `This is a ${tier.label} risk application scoring ${output.score}/100. Favorable ${output.shap[0].factor.toLowerCase()} metrics drive the score down. Even under stress scenarios, the score remains within acceptable bounds. Standard approval workflow is appropriate.`}
+              </p>
+            </div>
           </>
         )}
       </div>
