@@ -22,6 +22,7 @@ function useIsMobile(breakpoint = 768) {
 export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>('RISK_SCORE');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [demoMode, setDemoMode] = useState(true);
   const isMobile = useIsMobile();
   const [liveData, liveActions] = useLiveData();
 
@@ -37,7 +38,7 @@ export default function App() {
       color: C.text,
     }}>
       {/* Top Bar */}
-      <TopBar activeTab={activeTab} setActiveTab={setActiveTab} onMenuToggle={() => setSidebarOpen(!sidebarOpen)} isMobile={isMobile} liveData={liveData} liveActions={liveActions} />
+      <TopBar activeTab={activeTab} setActiveTab={setActiveTab} onMenuToggle={() => setSidebarOpen(!sidebarOpen)} isMobile={isMobile} liveData={liveData} liveActions={liveActions} demoMode={demoMode} setDemoMode={setDemoMode} />
 
       {/* Body */}
       <div style={{
@@ -89,9 +90,9 @@ export default function App() {
             display: 'flex',
             flexDirection: 'column',
           }}>
-            {activeTab === 'RISK_SCORE' && <RiskScore />}
-            {activeTab === 'FRAUD_DETECT' && <FraudDetect />}
-            {activeTab === 'PORTFOLIO' && <Portfolio />}
+            {activeTab === 'RISK_SCORE' && <RiskScore demoMode={demoMode} />}
+            {activeTab === 'FRAUD_DETECT' && <FraudDetect demoMode={demoMode} />}
+            {activeTab === 'PORTFOLIO' && <Portfolio demoMode={demoMode} />}
           </div>
         </main>
       </div>

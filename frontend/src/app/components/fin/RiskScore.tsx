@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, ReferenceLine, ResponsiveContainer, Tooltip } from 'recharts';
 import { ChevronDown, Play, Loader } from 'lucide-react';
-import { C, getScoreColor, getScoreTier } from './colors';
+import { C, getScoreColor, getScoreTier, DATA_SOURCE_STYLE } from './colors';
+import type { DataSourceKind } from './colors';
 
 const INDUSTRIES = ['Technology', 'Healthcare', 'Finance', 'Real Estate', 'Retail', 'Energy', 'Manufacturing', 'Agriculture'];
 
@@ -190,7 +191,7 @@ const CustomShapTooltip = ({ active, payload }: any) => {
   return null;
 };
 
-export function RiskScore() {
+export function RiskScore({ demoMode = true }: { demoMode?: boolean }) {
   const [loanAmount, setLoanAmount] = useState('250,000');
   const [creditScore, setCreditScore] = useState('680');
   const [dti, setDti] = useState('0.42');
@@ -245,6 +246,11 @@ export function RiskScore() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
             <div style={{ width: 3, height: 14, background: C.orange }} />
             <span style={{ fontFamily: C.mono, fontSize: 10, color: C.orange, letterSpacing: '0.15em' }}>RISK ASSESSMENT ENGINE</span>
+            {(() => { const src: DataSourceKind = demoMode ? 'SIMULATED' : 'LIVE'; const s = DATA_SOURCE_STYLE[src]; return (
+              <span style={{ fontFamily: C.mono, fontSize: 8, padding: '2px 7px', background: s.bg, border: `1px solid ${s.border}`, borderRadius: 2, color: s.color, letterSpacing: '0.08em', marginLeft: 4 }}>
+                {src}
+              </span>
+            ); })()}
           </div>
           <p style={{ fontFamily: C.sans, fontSize: 11, color: C.textDim, margin: 0, paddingLeft: 11 }}>
             Enter loan parameters to compute risk score and feature attribution

@@ -1,7 +1,8 @@
 import { useState, useRef, useCallback } from 'react';
 import { RadarChart, PolarGrid, PolarAngleAxis, Radar, ResponsiveContainer, Tooltip } from 'recharts';
 import { X, CheckCircle, AlertTriangle, Ban, ChevronRight, Shield, Upload, FileText, Clock } from 'lucide-react';
-import { C } from './colors';
+import { C, DATA_SOURCE_STYLE } from './colors';
+import type { DataSourceKind } from './colors';
 
 interface Transaction {
   id: string;
@@ -160,7 +161,7 @@ TXN-CSV-03,9100.00,CryptoSwap Ltd,API,91
 TXN-CSV-04,55.00,Coffee Bean,TAP,6
 TXN-CSV-05,3400.00,Jewelry Palace,ONLINE,67`;
 
-export function FraudDetect() {
+export function FraudDetect({ demoMode = true }: { demoMode?: boolean }) {
   const [selected, setSelected] = useState<Transaction | null>(TRANSACTIONS[2]);
   const [drawerOpen, setDrawerOpen] = useState(true);
   const [filter, setFilter] = useState<'ALL' | 'CLEAR' | 'REVIEW' | 'FLAGGED'>('ALL');
@@ -236,6 +237,11 @@ export function FraudDetect() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <div style={{ width: 3, height: 14, background: C.red }} />
             <span style={{ fontFamily: C.mono, fontSize: 10, color: C.red, letterSpacing: '0.15em' }}>FRAUD DETECTION ENGINE</span>
+            {(() => { const src: DataSourceKind = uploadedTxns.length > 0 ? 'CSV' : demoMode ? 'DEMO' : 'LIVE'; const s = DATA_SOURCE_STYLE[src]; return (
+              <span style={{ fontFamily: C.mono, fontSize: 8, padding: '2px 7px', background: s.bg, border: `1px solid ${s.border}`, borderRadius: 2, color: s.color, letterSpacing: '0.08em', marginLeft: 4 }}>
+                {src}
+              </span>
+            ); })()}
           </div>
           <div style={{ fontFamily: C.mono, fontSize: 9, color: C.textDim }}>|</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>

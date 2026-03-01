@@ -34,6 +34,43 @@ Proposed next action:
 
 ## Live Log
 
+### Cycle Timestamp (UTC): 2026-03-01T19:30:00Z
+Status: DONE
+Packet ID: P-DATA1
+
+Completed:
+- Global demoMode state in App.tsx with prop drilling to all modules
+- Demo Mode toggle switch in TopBar (ToggleLeft/ToggleRight icons, DEMO/LIVE label)
+- DataSourceKind type + DATA_SOURCE_STYLE config in colors.ts
+- Data source badge in RiskScore header (SIMULATED or LIVE)
+- Data source badge in FraudDetect header (CSV/DEMO/LIVE — context-aware based on upload state)
+- Data source badge in Portfolio header (SIMULATED or LIVE)
+
+Files changed:
+- frontend/src/app/App.tsx
+- frontend/src/app/components/fin/TopBar.tsx
+- frontend/src/app/components/fin/RiskScore.tsx
+- frontend/src/app/components/fin/FraudDetect.tsx
+- frontend/src/app/components/fin/Portfolio.tsx
+- frontend/src/app/components/fin/colors.ts
+
+Commits:
+- P-DATA1: module data-source visibility and demo-mode integrity controls
+
+Checks run:
+- npx vite build ✅ (680 kB bundle, no errors)
+
+Blockers:
+-
+
+Questions for Jarvis:
+-
+
+Proposed next action:
+- P-RISK2: regime and stress testing lab with actionable risk outputs
+
+---
+
 ### Cycle Timestamp (UTC): 2026-03-01T19:15:00Z
 Status: DONE
 Packet ID: P-FRAUD1

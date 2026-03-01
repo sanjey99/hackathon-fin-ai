@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Bell, User, ChevronDown, Wifi, Menu, WifiOff, Check, CheckCheck } from 'lucide-react';
+import { Bell, User, ChevronDown, Wifi, Menu, WifiOff, Check, CheckCheck, ToggleLeft, ToggleRight } from 'lucide-react';
 import { C } from './colors';
 import type { LiveData, LiveActions } from './useLiveData';
 
@@ -12,6 +12,8 @@ interface TopBarProps {
   isMobile?: boolean;
   liveData?: LiveData;
   liveActions?: LiveActions;
+  demoMode?: boolean;
+  setDemoMode?: (v: boolean) => void;
 }
 
 const TABS: { id: Tab; label: string }[] = [
@@ -20,7 +22,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'PORTFOLIO', label: 'PORTFOLIO' },
 ];
 
-export function TopBar({ activeTab, setActiveTab, onMenuToggle, isMobile, liveData, liveActions }: TopBarProps) {
+export function TopBar({ activeTab, setActiveTab, onMenuToggle, isMobile, liveData, liveActions, demoMode, setDemoMode }: TopBarProps) {
   const [time, setTime] = useState(new Date());
   const [alertPulse, setAlertPulse] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
@@ -209,6 +211,23 @@ export function TopBar({ activeTab, setActiveTab, onMenuToggle, isMobile, liveDa
             {liveData?.stale ? 'STALE' : liveData?.connected ? 'LIVE' : '···'}
           </span>
         </div>
+
+        {/* Demo Mode Toggle */}
+        <button
+          onClick={() => setDemoMode?.(!demoMode)}
+          title={demoMode ? 'Demo Mode ON — all data is simulated' : 'Demo Mode OFF — attempting live sources'}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 5,
+            background: demoMode ? 'rgba(255,214,0,0.1)' : 'rgba(0,255,156,0.08)',
+            border: `1px solid ${demoMode ? C.yellow : C.green}40`,
+            borderRadius: 3, padding: '3px 8px', cursor: 'pointer',
+          }}
+        >
+          {demoMode ? <ToggleLeft size={13} color={C.yellow} /> : <ToggleRight size={13} color={C.green} />}
+          <span style={{ fontFamily: C.mono, fontSize: 8, color: demoMode ? C.yellow : C.green, letterSpacing: '0.08em' }}>
+            {demoMode ? 'DEMO' : 'LIVE'}
+          </span>
+        </button>
 
         <div style={{ position: 'relative' }}>
           <button

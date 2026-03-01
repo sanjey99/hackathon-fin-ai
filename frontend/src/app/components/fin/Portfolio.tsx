@@ -4,7 +4,8 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { Plus, Minus, Play, Loader, TrendingUp, TrendingDown, AlertTriangle, X, ExternalLink, Info, Target, Shield, Zap } from 'lucide-react';
-import { C } from './colors';
+import { C, DATA_SOURCE_STYLE } from './colors';
+import type { DataSourceKind } from './colors';
 
 interface Asset {
   ticker: string;
@@ -129,7 +130,7 @@ const CustomFrontierTooltip = ({ active, payload }: any) => {
   return null;
 };
 
-export function Portfolio() {
+export function Portfolio({ demoMode = true }: { demoMode?: boolean }) {
   const [assets, setAssets] = useState<Asset[]>(INITIAL_ASSETS);
   const [newTicker, setNewTicker] = useState('');
   const [suggestions, setSuggestions] = useState<typeof TICKER_UNIVERSE>([]);
@@ -289,6 +290,11 @@ export function Portfolio() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
             <div style={{ width: 3, height: 14, background: C.orange }} />
             <span style={{ fontFamily: C.mono, fontSize: 10, color: C.orange, letterSpacing: '0.15em' }}>PORTFOLIO INPUT</span>
+            {(() => { const src: DataSourceKind = demoMode ? 'SIMULATED' : 'LIVE'; const s = DATA_SOURCE_STYLE[src]; return (
+              <span style={{ fontFamily: C.mono, fontSize: 8, padding: '2px 7px', background: s.bg, border: `1px solid ${s.border}`, borderRadius: 2, color: s.color, letterSpacing: '0.08em', marginLeft: 4 }}>
+                {src}
+              </span>
+            ); })()}
           </div>
 
           {/* Weight warning */}

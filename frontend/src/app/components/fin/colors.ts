@@ -30,3 +30,13 @@ export const getScoreTier = (score: number): { label: string; color: string; bg:
   if (score < 70) return { label: 'HIGH', color: C.orange, bg: 'rgba(255,107,0,0.12)' };
   return { label: 'CRITICAL', color: C.red, bg: 'rgba(255,59,59,0.12)' };
 };
+
+/* ── Data‑source badge styles ─────────────────────────────────────────────── */
+export type DataSourceKind = 'SIMULATED' | 'LIVE' | 'CSV' | 'DEMO';
+
+export const DATA_SOURCE_STYLE: Record<DataSourceKind, { color: string; bg: string; border: string }> = {
+  SIMULATED: { color: C.yellow, bg: 'rgba(255,214,0,0.08)', border: `${C.yellow}40` },
+  DEMO:      { color: C.yellow, bg: 'rgba(255,214,0,0.08)', border: `${C.yellow}40` },
+  LIVE:      { color: C.green,  bg: 'rgba(0,255,156,0.08)', border: `${C.green}40` },
+  CSV:       { color: C.cyan,   bg: 'rgba(0,212,255,0.08)', border: `${C.cyan}40` },
+};
