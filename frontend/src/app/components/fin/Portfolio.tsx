@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer,
 } from 'recharts';
-import { Plus, Minus, Play, Loader, TrendingUp, TrendingDown, AlertTriangle } from 'lucide-react';
-import { C } from './colors';
+import { Plus, Minus, Play, Loader, TrendingUp, TrendingDown, AlertTriangle, X, ExternalLink, Info, Target, Shield, Zap } from 'lucide-react';
+import { C, DATA_SOURCE_STYLE } from './colors';
+import type { DataSourceKind } from './colors';
 
 interface Asset {
   ticker: string;
@@ -13,6 +14,29 @@ interface Asset {
 }
 
 const COLORS = [C.orange, C.cyan, C.green, '#9B59B6', '#E74C3C', '#3498DB', '#F39C12', '#1ABC9C', '#E67E22'];
+
+/* ── Ticker auto-suggest universe ──────────────────────────────────────────── */
+const TICKER_UNIVERSE = [
+  { sym: 'AAPL', name: 'Apple Inc.' }, { sym: 'MSFT', name: 'Microsoft Corp.' },
+  { sym: 'GOOGL', name: 'Alphabet Inc.' }, { sym: 'AMZN', name: 'Amazon.com' },
+  { sym: 'TSLA', name: 'Tesla Inc.' }, { sym: 'NVDA', name: 'NVIDIA Corp.' },
+  { sym: 'META', name: 'Meta Platforms' }, { sym: 'JPM', name: 'JPMorgan Chase' },
+  { sym: 'V', name: 'Visa Inc.' }, { sym: 'JNJ', name: 'Johnson & Johnson' },
+  { sym: 'BND', name: 'Vanguard Total Bond' }, { sym: 'GLD', name: 'SPDR Gold Shares' },
+  { sym: 'VNQ', name: 'Vanguard Real Estate' }, { sym: 'QQQ', name: 'Invesco Nasdaq 100' },
+  { sym: 'SPY', name: 'SPDR S&P 500' }, { sym: 'IWM', name: 'iShares Russell 2000' },
+  { sym: 'XOM', name: 'Exxon Mobil' }, { sym: 'PFE', name: 'Pfizer Inc.' },
+  { sym: 'KO', name: 'Coca-Cola Co.' }, { sym: 'BAC', name: 'Bank of America' },
+  { sym: 'WMT', name: 'Walmart Inc.' }, { sym: 'HD', name: 'Home Depot' },
+  { sym: 'INTC', name: 'Intel Corp.' }, { sym: 'DIS', name: 'Walt Disney' },
+];
+
+type Objective = 'max_sharpe' | 'min_risk' | 'max_return';
+const OBJECTIVES: { id: Objective; label: string; icon: typeof Target; desc: string }[] = [
+  { id: 'max_sharpe', label: 'MAX SHARPE', icon: Target, desc: 'Maximize risk-adjusted return' },
+  { id: 'min_risk', label: 'MIN RISK', icon: Shield, desc: 'Minimize portfolio volatility' },
+  { id: 'max_return', label: 'MAX RETURN', icon: Zap, desc: 'Maximize expected return' },
+];
 
 const INITIAL_ASSETS: Asset[] = [
   { ticker: 'AAPL', weight: 20, color: COLORS[0] },
@@ -49,11 +73,12 @@ const PORTFOLIO_ALERTS = [
 
 const SEVERITY_COLOR: Record<string, string> = { high: C.red, medium: C.yellow, low: C.green };
 
-function TreemapBlock({ asset, optimized }: { asset: Asset; optimized?: number }) {
+function TreemapBlock({ asset, optimized, onClick }: { asset: Asset; optimized?: number; onClick?: () => void }) {
   const diff = optimized !== undefined ? optimized - asset.weight : 0;
   return (
     <div
-      title={`${asset.ticker}: ${asset.weight}% → ${optimized ?? asset.weight}%`}
+      onClick={onClick}
+      title={`${asset.ticker}: ${asset.weight}% → ${optimized ?? asset.weight}% — click for details`}
       style={{
         flex: `0 0 ${Math.max(asset.weight, 4)}%`,
         height: asset.weight > 15 ? 80 : asset.weight > 8 ? 60 : 44,
@@ -105,14 +130,24 @@ const CustomFrontierTooltip = ({ active, payload }: any) => {
   return null;
 };
 
-export function Portfolio() {
+export function Portfolio({ demoMode = true }: { demoMode?: boolean }) {
   const [assets, setAssets] = useState<Asset[]>(INITIAL_ASSETS);
   const [newTicker, setNewTicker] = useState('');
+  const [suggestions, setSuggestions] = useState<typeof TICKER_UNIVERSE>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [objective, setObjective] = useState<Objective>('max_sharpe');
   const [maxVol, setMaxVol] = useState(18);
   const [minReturn, setMinReturn] = useState(7);
   const [status, setStatus] = useState<'idle' | 'running' | 'done'>('done');
   const [showOptimized, setShowOptimized] = useState(true);
   const [healthScore, setHealthScore] = useState(76);
+  const [tickerError, setTickerError] = useState('');
+  const [drawerAsset, setDrawerAsset] = useState<Asset | null>(null);
+  const [frontierData, setFrontierData] = useState(FRONTIER);
+  const [currentPt, setCurrentPt] = useState([{ risk: 15.2, return: 8.7 }]);
+  const [optimizedPt, setOptimizedPt] = useState([{ risk: 11.8, return: 9.8 }]);
+  const [whyText, setWhyText] = useState('');
+  const suggestRef = useRef<HTMLDivElement>(null);
   const [metrics, setMetrics] = useState({
     sharpe: 1.24, var95: 3.8, maxDrawdown: 12.4, expectedReturn: 8.7
   });
@@ -131,11 +166,30 @@ export function Portfolio() {
 
   const totalWeight = assets.reduce((sum, a) => sum + a.weight, 0);
 
-  const addAsset = () => {
-    const t = newTicker.trim().toUpperCase();
-    if (!t || assets.find(a => a.ticker === t)) return;
+  const addAsset = (ticker?: string) => {
+    const t = (ticker ?? newTicker).trim().toUpperCase();
+    setTickerError('');
+    if (!t) { setTickerError('Enter a ticker symbol'); return; }
+    if (!/^[A-Z]{1,6}$/.test(t)) { setTickerError('Invalid ticker format'); return; }
+    if (assets.find(a => a.ticker === t)) { setTickerError(`${t} already in portfolio`); return; }
+    if (assets.length >= 15) { setTickerError('Max 15 assets'); return; }
     setAssets(prev => [...prev, { ticker: t, weight: 5, color: COLORS[prev.length % COLORS.length] }]);
     setNewTicker('');
+    setShowSuggestions(false);
+  };
+
+  const onTickerInput = (val: string) => {
+    const v = val.toUpperCase();
+    setNewTicker(v);
+    setTickerError('');
+    if (v.length > 0) {
+      const existing = new Set(assets.map(a => a.ticker));
+      const matches = TICKER_UNIVERSE.filter(t => !existing.has(t.sym) && (t.sym.startsWith(v) || t.name.toUpperCase().includes(v)));
+      setSuggestions(matches.slice(0, 6));
+      setShowSuggestions(matches.length > 0);
+    } else {
+      setShowSuggestions(false);
+    }
   };
 
   const removeAsset = (ticker: string) => {
@@ -149,22 +203,55 @@ export function Portfolio() {
   const runOptimizer = () => {
     setStatus('running');
     setTimeout(() => {
+      // Objective-aware optimized weights
+      const objConfig: Record<Objective, { weights: Record<string, number>; health: number; m: typeof metrics; pt: { risk: number; return: number }; why: string }> = {
+        max_sharpe: {
+          weights: { AAPL: 18, MSFT: 22, GOOGL: 12, AMZN: 8, TSLA: 3, BND: 25, GLD: 8, VNQ: 4 },
+          health: 84,
+          m: { sharpe: 1.52, var95: 3.1, maxDrawdown: 10.2, expectedReturn: 9.8 },
+          pt: { risk: 11.8, return: 9.8 },
+          why: 'The optimizer maximized the Sharpe ratio by reducing high-volatility positions (TSLA −2%, VNQ −1%) and increasing stable exposures (BND +5%, MSFT +7%). This shifts the portfolio closer to the efficient frontier tangent point, yielding a 22% improvement in risk-adjusted return.',
+        },
+        min_risk: {
+          weights: { AAPL: 12, MSFT: 14, GOOGL: 8, AMZN: 6, TSLA: 2, BND: 35, GLD: 15, VNQ: 8 },
+          health: 88,
+          m: { sharpe: 1.18, var95: 2.2, maxDrawdown: 7.5, expectedReturn: 6.4 },
+          pt: { risk: 7.5, return: 6.4 },
+          why: 'Volatility minimization increased fixed income (BND +15%) and gold (GLD +5%) allocations while reducing equity exposure. This portfolio sits on the minimum-variance point of the efficient frontier, cutting drawdown risk by 40%.',
+        },
+        max_return: {
+          weights: { AAPL: 25, MSFT: 28, GOOGL: 18, AMZN: 14, TSLA: 8, BND: 3, GLD: 2, VNQ: 2 },
+          health: 62,
+          m: { sharpe: 0.95, var95: 5.8, maxDrawdown: 18.1, expectedReturn: 13.2 },
+          pt: { risk: 20.5, return: 13.2 },
+          why: 'Maximum return tilts aggressively into growth equities (+MSFT, +AAPL, +TSLA) at the cost of higher volatility. VaR rises to 5.8% and drawdown risk increases significantly. This sits near the top-right of the efficient frontier.',
+        },
+      };
+      const cfg = objConfig[objective];
       setAssets(prev => prev.map(a => ({
         ...a,
-        weight: OPTIMIZED_WEIGHTS[a.ticker] ?? a.weight,
+        weight: cfg.weights[a.ticker] ?? a.weight,
       })));
-      setHealthScore(84);
-      setMetrics({ sharpe: 1.52, var95: 3.1, maxDrawdown: 10.2, expectedReturn: 9.8 });
+      setHealthScore(cfg.health);
+      setMetrics(cfg.m);
+      setOptimizedPt([cfg.pt]);
+      setWhyText(cfg.why);
+      // Regenerate frontier with slight variation per objective
+      const seed = objective === 'min_risk' ? 0.8 : objective === 'max_return' ? 1.3 : 1.0;
+      setFrontierData(Array.from({ length: 30 }, (_, i) => {
+        const t = i / 29;
+        const risk = 2 + t * 22 * seed;
+        const ret = 1.5 + Math.pow(t, 0.5) * 10 * seed + t * 2;
+        return { risk: parseFloat(risk.toFixed(2)), return: parseFloat(ret.toFixed(2)) };
+      }));
       setShowOptimized(true);
       setStatus('done');
     }, 2000);
   };
 
-  // Scatter data for current and optimized
-  const currentPoint = [{ risk: 15.2, return: 8.7 }];
-  const optimizedPoint = [{ risk: 11.8, return: 9.8 }];
+  // Scatter data from state (currentPt, optimizedPt)
 
-  const MetricRow = ({ label, value, unit, color, prev }: { label: string; value: number; unit: string; color?: string; prev?: number }) => {
+  const MetricRow = ({ label, value, unit, color, prev, tooltip }: { label: string; value: number; unit: string; color?: string; prev?: number; tooltip?: string }) => {
     const increased = prev !== undefined && value > prev;
     const decreased = prev !== undefined && value < prev;
     return (
@@ -188,7 +275,7 @@ export function Portfolio() {
   };
 
   return (
-    <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
+    <div data-portfolio-layout style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
 
       {/* LEFT: Portfolio Input 280px */}
       <div style={{
@@ -203,6 +290,11 @@ export function Portfolio() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
             <div style={{ width: 3, height: 14, background: C.orange }} />
             <span style={{ fontFamily: C.mono, fontSize: 10, color: C.orange, letterSpacing: '0.15em' }}>PORTFOLIO INPUT</span>
+            {(() => { const src: DataSourceKind = demoMode ? 'SIMULATED' : 'LIVE'; const s = DATA_SOURCE_STYLE[src]; return (
+              <span style={{ fontFamily: C.mono, fontSize: 8, padding: '2px 7px', background: s.bg, border: `1px solid ${s.border}`, borderRadius: 2, color: s.color, letterSpacing: '0.08em', marginLeft: 4 }}>
+                {src}
+              </span>
+            ); })()}
           </div>
 
           {/* Weight warning */}
@@ -272,44 +364,90 @@ export function Portfolio() {
           ))}
 
           {/* Add row */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0' }}>
-            <input
-              placeholder="TICKER"
-              value={newTicker}
-              onChange={e => setNewTicker(e.target.value.toUpperCase())}
-              onKeyDown={e => e.key === 'Enter' && addAsset()}
-              style={{
-                flex: 1,
-                background: C.bgCard,
-                border: `1px solid ${C.border}`,
-                borderRadius: 2,
-                color: C.text,
-                fontFamily: C.mono,
-                fontSize: 11,
-                padding: '5px 8px',
-                outline: 'none',
-              }}
-            />
-            <button
-              onClick={addAsset}
-              style={{
-                background: 'rgba(255,107,0,0.15)',
-                border: `1px solid ${C.orange}40`,
-                borderRadius: 2,
-                color: C.orange,
-                padding: '5px 8px',
-                cursor: 'pointer',
-                display: 'flex', alignItems: 'center', gap: 4,
-                fontFamily: C.mono, fontSize: 9,
-              }}
-            >
-              <Plus size={11} /> ADD
-            </button>
+          <div style={{ position: 'relative' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0' }}>
+              <input
+                placeholder="TICKER"
+                value={newTicker}
+                onChange={e => onTickerInput(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') addAsset(); if (e.key === 'Escape') setShowSuggestions(false); }}
+                onFocus={() => newTicker.length > 0 && suggestions.length > 0 && setShowSuggestions(true)}
+                onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                style={{
+                  flex: 1,
+                  background: C.bgCard,
+                  border: `1px solid ${tickerError ? C.red : C.border}`,
+                  borderRadius: 2,
+                  color: C.text,
+                  fontFamily: C.mono,
+                  fontSize: 11,
+                  padding: '5px 8px',
+                  outline: 'none',
+                }}
+              />
+              <button
+                onClick={() => addAsset()}
+                style={{
+                  background: 'rgba(255,107,0,0.15)',
+                  border: `1px solid ${C.orange}40`,
+                  borderRadius: 2,
+                  color: C.orange,
+                  padding: '5px 8px',
+                  cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', gap: 4,
+                  fontFamily: C.mono, fontSize: 9,
+                }}
+              >
+                <Plus size={11} /> ADD
+              </button>
+            </div>
+            {tickerError && <div style={{ fontFamily: C.mono, fontSize: 8, color: C.red, marginBottom: 4 }}>{tickerError}</div>}
+            {/* Auto-suggest dropdown */}
+            {showSuggestions && suggestions.length > 0 && (
+              <div ref={suggestRef} style={{
+                position: 'absolute', top: 38, left: 0, right: 40, zIndex: 200,
+                background: C.bgPanel, border: `1px solid ${C.border}`, borderRadius: 2,
+                boxShadow: '0 4px 12px rgba(0,0,0,0.5)', maxHeight: 140, overflowY: 'auto',
+              }}>
+                {suggestions.map(s => (
+                  <div key={s.sym} onMouseDown={() => addAsset(s.sym)} style={{
+                    padding: '6px 10px', cursor: 'pointer', display: 'flex', gap: 8, alignItems: 'center',
+                    borderBottom: `1px solid ${C.border}`,
+                  }}
+                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(255,107,0,0.08)'}
+                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
+                  >
+                    <span style={{ fontFamily: C.mono, fontSize: 10, color: C.orange, width: 40 }}>{s.sym}</span>
+                    <span style={{ fontFamily: C.sans, fontSize: 9, color: C.textDim }}>{s.name}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Constraints */}
+        {/* Objective & Constraints */}
         <div style={{ padding: 16, borderTop: `1px solid ${C.border}`, flexShrink: 0 }}>
+          {/* Objective selector */}
+          <span style={{ fontFamily: C.mono, fontSize: 9, color: C.textDim, letterSpacing: '0.1em', display: 'block', marginBottom: 8 }}>OBJECTIVE</span>
+          <div style={{ display: 'flex', gap: 4, marginBottom: 14 }}>
+            {OBJECTIVES.map(obj => {
+              const Icon = obj.icon;
+              const sel = objective === obj.id;
+              return (
+                <button key={obj.id} onClick={() => setObjective(obj.id)} title={obj.desc} style={{
+                  flex: 1, padding: '6px 0', background: sel ? 'rgba(255,107,0,0.15)' : 'transparent',
+                  border: `1px solid ${sel ? C.orange + '60' : C.border}`, borderRadius: 2,
+                  color: sel ? C.orange : C.textDim, cursor: 'pointer', fontFamily: C.mono, fontSize: 7,
+                  letterSpacing: '0.06em', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+                }}>
+                  <Icon size={10} />
+                  {obj.label}
+                </button>
+              );
+            })}
+          </div>
+
           <span style={{ fontFamily: C.mono, fontSize: 9, color: C.textDim, letterSpacing: '0.1em', display: 'block', marginBottom: 12 }}>CONSTRAINTS</span>
 
           <div style={{ marginBottom: 12 }}>
@@ -410,6 +548,7 @@ export function Portfolio() {
                 key={asset.ticker}
                 asset={asset}
                 optimized={showOptimized ? OPTIMIZED_WEIGHTS[asset.ticker] : undefined}
+                onClick={() => setDrawerAsset(asset)}
               />
             ))}
           </div>
@@ -453,23 +592,23 @@ export function Portfolio() {
                 />
                 <Tooltip content={<CustomFrontierTooltip />} cursor={{ strokeDasharray: '3 3', stroke: C.border }} />
                 {/* Frontier curve */}
-                <Scatter data={FRONTIER} fill={C.cyan} fillOpacity={0.4} line={{ stroke: C.cyan, strokeWidth: 1.5, strokeOpacity: 0.8 }} shape="circle" r={2} />
+                <Scatter data={frontierData} fill={C.cyan} fillOpacity={0.4} line={{ stroke: C.cyan, strokeWidth: 1.5, strokeOpacity: 0.8 }} shape="circle" r={2} />
                 {/* Current portfolio */}
-                <Scatter data={currentPoint} fill={C.orange} r={8} shape="circle" name="Current" />
+                <Scatter data={currentPt} fill={C.orange} r={8} shape="circle" name="Current" />
                 {/* Optimized portfolio */}
-                {showOptimized && <Scatter data={optimizedPoint} fill={C.green} r={8} shape="diamond" name="Optimized" />}
+                {showOptimized && <Scatter data={optimizedPt} fill={C.green} r={8} shape="diamond" name="Optimized" />}
               </ScatterChart>
             </ResponsiveContainer>
           </div>
           <div style={{ display: 'flex', gap: 16, justifyContent: 'center', flexShrink: 0, marginTop: 4 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
               <div style={{ width: 8, height: 8, borderRadius: '50%', background: C.orange }} />
-              <span style={{ fontFamily: C.mono, fontSize: 8, color: C.textDim }}>CURRENT (σ=15.2%, r=8.7%)</span>
+              <span style={{ fontFamily: C.mono, fontSize: 8, color: C.textDim }}>CURRENT (σ={currentPt[0].risk}%, r={currentPt[0].return}%)</span>
             </div>
             {showOptimized && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                 <div style={{ width: 8, height: 8, background: C.green, transform: 'rotate(45deg)' }} />
-                <span style={{ fontFamily: C.mono, fontSize: 8, color: C.textDim }}>OPTIMIZED (σ=11.8%, r=9.8%)</span>
+                <span style={{ fontFamily: C.mono, fontSize: 8, color: C.textDim }}>OPTIMIZED (σ={optimizedPt[0].risk}%, r={optimizedPt[0].return}%)</span>
               </div>
             )}
           </div>
@@ -521,30 +660,38 @@ export function Portfolio() {
         <div style={{ padding: '12px 16px', borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
           <span style={{ fontFamily: C.mono, fontSize: 9, color: C.orange, letterSpacing: '0.12em', display: 'block', marginBottom: 8 }}>KEY METRICS</span>
           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: `1px solid ${C.border}` }}>
-            <span style={{ fontFamily: C.sans, fontSize: 11, color: C.textDim }}>Sharpe Ratio</span>
+            <span style={{ fontFamily: C.sans, fontSize: 11, color: C.textDim, display: 'flex', alignItems: 'center', gap: 4 }}>Sharpe Ratio <Info size={8} title="Risk-adjusted return: excess return per unit of volatility. Higher is better." style={{ cursor: 'help' }} /></span>
             <span style={{ fontFamily: C.mono, fontSize: 13, color: metrics.sharpe >= 1.5 ? C.green : metrics.sharpe >= 1.0 ? C.yellow : C.red }}>
               {metrics.sharpe}
             </span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: `1px solid ${C.border}` }}>
-            <span style={{ fontFamily: C.sans, fontSize: 11, color: C.textDim }}>VaR (95%)</span>
+            <span style={{ fontFamily: C.sans, fontSize: 11, color: C.textDim, display: 'flex', alignItems: 'center', gap: 4 }}>VaR (95%) <Info size={8} title="Value at Risk: Maximum expected loss over 1 day at 95% confidence. Lower is better." style={{ cursor: 'help' }} /></span>
             <span style={{ fontFamily: C.mono, fontSize: 13, color: metrics.var95 < 4 ? C.green : C.yellow }}>
               -{metrics.var95}%
             </span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: `1px solid ${C.border}` }}>
-            <span style={{ fontFamily: C.sans, fontSize: 11, color: C.textDim }}>Max Drawdown</span>
+            <span style={{ fontFamily: C.sans, fontSize: 11, color: C.textDim, display: 'flex', alignItems: 'center', gap: 4 }}>Max Drawdown <Info size={8} title="Largest peak-to-trough decline in portfolio value. Lower is better." style={{ cursor: 'help' }} /></span>
             <span style={{ fontFamily: C.mono, fontSize: 13, color: metrics.maxDrawdown < 12 ? C.yellow : C.red }}>
               -{metrics.maxDrawdown}%
             </span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0' }}>
-            <span style={{ fontFamily: C.sans, fontSize: 11, color: C.textDim }}>Expected Return</span>
+            <span style={{ fontFamily: C.sans, fontSize: 11, color: C.textDim, display: 'flex', alignItems: 'center', gap: 4 }}>Expected Return <Info size={8} title="Annualized expected portfolio return based on historical factor analysis." style={{ cursor: 'help' }} /></span>
             <span style={{ fontFamily: C.mono, fontSize: 13, color: C.green }}>
               +{metrics.expectedReturn}%
             </span>
           </div>
         </div>
+
+        {/* Why this recommendation? */}
+        {whyText && (
+          <div style={{ padding: '10px 16px', borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
+            <span style={{ fontFamily: C.mono, fontSize: 9, color: C.cyan, letterSpacing: '0.1em', display: 'block', marginBottom: 6 }}>WHY THIS RECOMMENDATION?</span>
+            <p style={{ fontFamily: C.sans, fontSize: 10, color: C.text, lineHeight: 1.5, margin: 0 }}>{whyText}</p>
+          </div>
+        )}
 
         {/* Alert Feed */}
         <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
@@ -589,6 +736,69 @@ export function Portfolio() {
           </div>
         </div>
       </div>
+
+      {/* Asset Detail Drawer */}
+      {drawerAsset && (
+        <>
+          <div onClick={() => setDrawerAsset(null)} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 400 }} />
+          <div style={{
+            position: 'absolute', top: 0, right: 0, bottom: 0, width: 300,
+            background: C.bgPanel, borderLeft: `1px solid ${C.border}`,
+            zIndex: 401, display: 'flex', flexDirection: 'column', overflow: 'hidden',
+            boxShadow: '-4px 0 24px rgba(0,0,0,0.4)',
+          }}>
+            <div style={{ padding: '14px 16px', borderBottom: `1px solid ${C.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ width: 4, height: 18, background: drawerAsset.color, borderRadius: 1 }} />
+                <span style={{ fontFamily: C.mono, fontSize: 16, color: C.text, fontWeight: 600 }}>{drawerAsset.ticker}</span>
+              </div>
+              <button onClick={() => setDrawerAsset(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.textDim, padding: 4 }}>
+                <X size={14} />
+              </button>
+            </div>
+            <div style={{ padding: 16, flex: 1, overflowY: 'auto' }}>
+              {/* Name lookup */}
+              {(() => {
+                const info = TICKER_UNIVERSE.find(t => t.sym === drawerAsset.ticker);
+                return info ? <div style={{ fontFamily: C.sans, fontSize: 11, color: C.textDim, marginBottom: 12 }}>{info.name}</div> : null;
+              })()}
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: `1px solid ${C.border}` }}>
+                <span style={{ fontFamily: C.sans, fontSize: 10, color: C.textDim }}>Current Weight</span>
+                <span style={{ fontFamily: C.mono, fontSize: 12, color: C.text }}>{drawerAsset.weight}%</span>
+              </div>
+              {showOptimized && OPTIMIZED_WEIGHTS[drawerAsset.ticker] !== undefined && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: `1px solid ${C.border}` }}>
+                  <span style={{ fontFamily: C.sans, fontSize: 10, color: C.textDim }}>Optimized Weight</span>
+                  <span style={{ fontFamily: C.mono, fontSize: 12, color: C.green }}>{OPTIMIZED_WEIGHTS[drawerAsset.ticker]}%</span>
+                </div>
+              )}
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: `1px solid ${C.border}` }}>
+                <span style={{ fontFamily: C.sans, fontSize: 10, color: C.textDim }}>Portfolio Share</span>
+                <span style={{ fontFamily: C.mono, fontSize: 12, color: C.text }}>{totalWeight > 0 ? (drawerAsset.weight / totalWeight * 100).toFixed(1) : 0}%</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: `1px solid ${C.border}` }}>
+                <span style={{ fontFamily: C.sans, fontSize: 10, color: C.textDim }}>Color</span>
+                <div style={{ width: 14, height: 14, background: drawerAsset.color, borderRadius: 2 }} />
+              </div>
+              <a
+                href={`https://finance.yahoo.com/quote/${drawerAsset.ticker}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  marginTop: 16, padding: '8px 12px',
+                  border: `1px solid ${C.cyan}40`, borderRadius: 2,
+                  background: 'rgba(0,199,172,0.08)', textDecoration: 'none',
+                  fontFamily: C.mono, fontSize: 10, color: C.cyan,
+                  cursor: 'pointer',
+                }}
+              >
+                <ExternalLink size={11} /> View on Yahoo Finance
+              </a>
+            </div>
+          </div>
+        </>
+      )}
 
       <style>{`
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }

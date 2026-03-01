@@ -203,3 +203,39 @@ curl -sf -X POST http://localhost:4000/api/infer \
 #    - Footer shows "Hackathon build – deploy ready"
 #    - No blank screens on any tab
 ```
+
+---
+
+## Mobile QA (M-CRIT1)
+
+### Device Testing Matrix
+
+| Device/Width | Target | Priority |
+|---|---|---|
+| 320px (iPhone SE) | All content visible, no horizontal scroll | P0 |
+| 375px (iPhone 12/13) | Single-column layouts, touch targets ≥ 40px | P0 |
+| 430px (iPhone 14 Pro Max) | Comfortable spacing, readable text | P0 |
+| 768px (iPad portrait) | Sidebar hidden, 1-col layouts | P1 |
+
+### Mobile QA Checklist
+
+1. **No horizontal overflow** — swipe left/right should not reveal off-screen content on any tab
+2. **TopBar** — brand visible, tabs scrollable horizontally, hamburger menu opens sidebar overlay
+3. **Sidebar** — hidden by default on ≤768px; opens as overlay via menu button; dismissible by tapping overlay
+4. **Risk Score tab** — input form stacks above output panel; gauge + SHAP chart fit in viewport width
+5. **Portfolio tab** — input panel stacks above charts; allocation map wraps properly; efficient frontier chart readable
+6. **Fraud Detect tab** — transaction table scrolls horizontally inside container; drawer opens below table on mobile
+7. **All buttons** — minimum 40px touch target; no tiny click areas
+8. **Input fields** — 16px font-size to prevent iOS auto-zoom on focus
+9. **Scrolling** — all panels have `-webkit-overflow-scrolling: touch` for smooth momentum scroll
+
+### Testing Commands
+```bash
+# Chrome DevTools mobile simulation
+# 1. Open http://localhost:5173
+# 2. F12 → Toggle Device Toolbar (Ctrl+Shift+M)
+# 3. Select "iPhone SE" (320px), "iPhone 12 Pro" (390px), "iPhone 14 Pro Max" (430px)
+# 4. Navigate all tabs and verify no horizontal overflow
+# 5. Test hamburger menu → sidebar overlay → dismiss
+# 6. Verify all buttons and inputs are usable with touch
+```

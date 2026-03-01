@@ -1,15 +1,30 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { TopBar } from './components/fin/TopBar';
 import { Sidebar } from './components/fin/Sidebar';
 import { RiskScore } from './components/fin/RiskScore';
 import { FraudDetect } from './components/fin/FraudDetect';
 import { Portfolio } from './components/fin/Portfolio';
 import { C } from './components/fin/colors';
+import { useLiveData } from './components/fin/useLiveData';
 
 type Tab = 'RISK_SCORE' | 'FRAUD_DETECT' | 'PORTFOLIO';
 
+function useIsMobile(breakpoint = 768) {
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= breakpoint);
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth <= breakpoint);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, [breakpoint]);
+  return isMobile;
+}
+
 export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>('RISK_SCORE');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [demoMode, setDemoMode] = useState(true);
+  const isMobile = useIsMobile();
+  const [liveData, liveActions] = useLiveData();
 
   return (
     <div style={{
@@ -23,7 +38,7 @@ export default function App() {
       color: C.text,
     }}>
       {/* Top Bar */}
-      <TopBar activeTab={activeTab} setActiveTab={setActiveTab} />
+      <TopBar activeTab={activeTab} setActiveTab={setActiveTab} onMenuToggle={() => setSidebarOpen(!sidebarOpen)} isMobile={isMobile} liveData={liveData} liveActions={liveActions} demoMode={demoMode} setDemoMode={setDemoMode} />
 
       {/* Body */}
       <div style={{
@@ -32,8 +47,16 @@ export default function App() {
         overflow: 'hidden',
         minHeight: 0,
       }}>
-        {/* Sidebar */}
-        <Sidebar />
+        {/* Sidebar — hidden on mobile via CSS, shown in overlay */}
+        {!isMobile && <Sidebar liveAlerts={liveData.alerts} />}
+        {isMobile && (
+          <>
+            <div data-mobile-sidebar-overlay className={sidebarOpen ? 'open' : ''} onClick={() => setSidebarOpen(false)} />
+            <div data-mobile-sidebar-panel className={sidebarOpen ? 'open' : ''} style={{ background: C.bgPanel }}>
+              <Sidebar liveAlerts={liveData.alerts} />
+            </div>
+          </>
+        )}
 
         {/* Main Content */}
         <main style={{
@@ -67,9 +90,9 @@ export default function App() {
             display: 'flex',
             flexDirection: 'column',
           }}>
-            {activeTab === 'RISK_SCORE' && <RiskScore />}
-            {activeTab === 'FRAUD_DETECT' && <FraudDetect />}
-            {activeTab === 'PORTFOLIO' && <Portfolio />}
+            {activeTab === 'RISK_SCORE' && <RiskScore demoMode={demoMode} />}
+            {activeTab === 'FRAUD_DETECT' && <FraudDetect demoMode={demoMode} />}
+            {activeTab === 'PORTFOLIO' && <Portfolio demoMode={demoMode} />}
           </div>
         </main>
       </div>

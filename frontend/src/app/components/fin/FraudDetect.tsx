@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { RadarChart, PolarGrid, PolarAngleAxis, Radar, ResponsiveContainer, Tooltip } from 'recharts';
-import { X, CheckCircle, AlertTriangle, Ban, ChevronRight, Shield } from 'lucide-react';
-import { C } from './colors';
+import { X, CheckCircle, AlertTriangle, Ban, ChevronRight, Shield, Upload, FileText, Clock } from 'lucide-react';
+import { C, DATA_SOURCE_STYLE } from './colors';
+import type { DataSourceKind } from './colors';
 
 interface Transaction {
   id: string;
@@ -93,20 +94,132 @@ function FraudScoreBar({ score }: { score: number }) {
   );
 }
 
-export function FraudDetect() {
+/* ── Audit timeline type ───────────────────────────────────────────────────── */
+interface AuditEntry {
+  txnId: string;
+  action: string;
+  time: number;
+  user: string;
+}
+
+/* ── CSV parsing helper ────────────────────────────────────────────────────── */
+const MAX_CSV_ROWS = 25;
+
+function parseCSV(text: string): { rows: Transaction[]; errors: string[] } {
+  const errors: string[] = [];
+  const lines = text.trim().split('\n');
+  if (lines.length < 2) { errors.push('CSV must have a header row plus at least 1 data row.'); return { rows: [], errors }; }
+
+  const header = lines[0].split(',').map(h => h.trim().toLowerCase());
+  const requiredCols = ['id', 'amount', 'merchant'];
+  const missing = requiredCols.filter(c => !header.includes(c));
+  if (missing.length > 0) { errors.push(`Missing required columns: ${missing.join(', ')}`); return { rows: [], errors }; }
+
+  const dataLines = lines.slice(1);
+  if (dataLines.length > MAX_CSV_ROWS) {
+    errors.push(`CSV has ${dataLines.length} rows — max ${MAX_CSV_ROWS}. Only first ${MAX_CSV_ROWS} will be processed.`);
+  }
+
+  const rows: Transaction[] = [];
+  const idIdx = header.indexOf('id');
+  const amtIdx = header.indexOf('amount');
+  const merchIdx = header.indexOf('merchant');
+  const channelIdx = header.indexOf('channel');
+  const scoreIdx = header.indexOf('fraudscore') !== -1 ? header.indexOf('fraudscore') : header.indexOf('fraud_score');
+
+  for (let i = 0; i < Math.min(dataLines.length, MAX_CSV_ROWS); i++) {
+    const cols = dataLines[i].split(',').map(c => c.trim());
+    const id = cols[idIdx] || `CSV-${i + 1}`;
+    const amount = parseFloat(cols[amtIdx]);
+    if (isNaN(amount)) { errors.push(`Row ${i + 1}: invalid amount "${cols[amtIdx]}"`); continue; }
+    const merchant = cols[merchIdx] || 'Unknown';
+    const channel = cols[channelIdx] || 'ONLINE';
+    const score = scoreIdx >= 0 ? parseInt(cols[scoreIdx]) || Math.floor(Math.random() * 100) : Math.floor(Math.random() * 100);
+    const status: Transaction['status'] = score >= 65 ? 'FLAGGED' : score >= 40 ? 'REVIEW' : 'CLEAR';
+    rows.push({
+      id, ts: new Date().toLocaleTimeString('en-US', { hour12: false }), amount, merchant, channel,
+      fraudScore: score, status,
+      radarData: [
+        { subject: 'Velocity', A: Math.min(100, score + Math.floor(Math.random() * 20 - 10)) },
+        { subject: 'Geo-Risk', A: Math.floor(Math.random() * 80) },
+        { subject: 'Device Trust', A: Math.max(0, 100 - score + Math.floor(Math.random() * 20 - 10)) },
+        { subject: 'Merchant Risk', A: Math.floor(Math.random() * 80) },
+        { subject: 'Time Anomaly', A: Math.floor(Math.random() * 80) },
+        { subject: 'Amt Dev', A: Math.min(100, score + Math.floor(Math.random() * 15)) },
+      ],
+      ruleTriggers: score > 50 ? [`R-${Math.floor(Math.random() * 100).toString().padStart(3, '0')}: Auto-flagged`] : [],
+      anomalies: score > 60 ? ['Uploaded CSV record'] : [],
+    });
+  }
+  return { rows, errors };
+}
+
+const SAMPLE_CSV = `id,amount,merchant,channel,fraudscore
+TXN-CSV-01,4200.00,SlotMachineOnline,ONLINE,82
+TXN-CSV-02,189.50,Grocery Hub,POS,12
+TXN-CSV-03,9100.00,CryptoSwap Ltd,API,91
+TXN-CSV-04,55.00,Coffee Bean,TAP,6
+TXN-CSV-05,3400.00,Jewelry Palace,ONLINE,67`;
+
+export function FraudDetect({ demoMode = true }: { demoMode?: boolean }) {
   const [selected, setSelected] = useState<Transaction | null>(TRANSACTIONS[2]);
   const [drawerOpen, setDrawerOpen] = useState(true);
   const [filter, setFilter] = useState<'ALL' | 'CLEAR' | 'REVIEW' | 'FLAGGED'>('ALL');
   const [actionDone, setActionDone] = useState<Record<string, string>>({});
 
-  const filtered = filter === 'ALL' ? TRANSACTIONS : TRANSACTIONS.filter(t => t.status === filter);
+  /* ── CSV upload state ─────────────────────────────────────────────── */
+  const [uploadedTxns, setUploadedTxns] = useState<Transaction[]>([]);
+  const [parseErrors, setParseErrors] = useState<string[]>([]);
+  const [isDragging, setIsDragging] = useState(false);
+  const [showUploadZone, setShowUploadZone] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
+  /* ── Audit log ────────────────────────────────────────────────────── */
+  const [auditLog, setAuditLog] = useState<AuditEntry[]>([]);
+
+  /* ── Active dataset (uploaded overrides hardcoded) ─────────────── */
+  const allTxns = uploadedTxns.length > 0 ? uploadedTxns : TRANSACTIONS;
+  const filtered = filter === 'ALL' ? allTxns : allTxns.filter(t => t.status === filter);
+
+  /* ── CSV ingest handler ───────────────────────────────────────────── */
+  const handleCSV = useCallback((text: string) => {
+    const { rows, errors } = parseCSV(text);
+    setParseErrors(errors);
+    if (rows.length > 0) {
+      setUploadedTxns(rows);
+      setSelected(rows[0]);
+      setDrawerOpen(true);
+      setActionDone({});
+      setAuditLog(prev => [...prev, { txnId: '-', action: `CSV UPLOADED (${rows.length} rows)`, time: Date.now(), user: 'analyst' }]);
+    }
+    setShowUploadZone(false);
+  }, []);
+
+  const handleFileDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files[0];
+    if (file && (file.name.endsWith('.csv') || file.type === 'text/csv')) {
+      file.text().then(handleCSV);
+    } else {
+      setParseErrors(['Only .csv files are supported.']);
+    }
+  }, [handleCSV]);
+
+  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) file.text().then(handleCSV);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  }, [handleCSV]);
+
+  /* ── Action handler (now records audit) ──────────────────────────── */
   const handleAction = (txnId: string, action: string) => {
     setActionDone(prev => ({ ...prev, [txnId]: action }));
+    setAuditLog(prev => [...prev, { txnId, action, time: Date.now(), user: 'analyst' }]);
   };
 
   return (
-    <div style={{ display: 'flex', height: '100%', overflow: 'hidden', position: 'relative' }}>
+    <div data-fraud-layout style={{ display: 'flex', height: '100%', overflow: 'hidden', position: 'relative' }}>
 
       {/* Main Table Area */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -119,20 +232,56 @@ export function FraudDetect() {
           gap: 16,
           background: C.bgPanel,
           flexShrink: 0,
+          flexWrap: 'wrap',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <div style={{ width: 3, height: 14, background: C.red }} />
             <span style={{ fontFamily: C.mono, fontSize: 10, color: C.red, letterSpacing: '0.15em' }}>FRAUD DETECTION ENGINE</span>
+            {(() => { const src: DataSourceKind = uploadedTxns.length > 0 ? 'CSV' : demoMode ? 'DEMO' : 'LIVE'; const s = DATA_SOURCE_STYLE[src]; return (
+              <span style={{ fontFamily: C.mono, fontSize: 8, padding: '2px 7px', background: s.bg, border: `1px solid ${s.border}`, borderRadius: 2, color: s.color, letterSpacing: '0.08em', marginLeft: 4 }}>
+                {src}
+              </span>
+            ); })()}
           </div>
           <div style={{ fontFamily: C.mono, fontSize: 9, color: C.textDim }}>|</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
             <div style={{ width: 5, height: 5, borderRadius: '50%', background: C.green, animation: 'blink 2s infinite' }} />
-            <span style={{ fontFamily: C.mono, fontSize: 9, color: C.green }}>LIVE · {TRANSACTIONS.length} TRANSACTIONS · TODAY 09:00–10:00</span>
+            <span style={{ fontFamily: C.mono, fontSize: 9, color: C.green }}>LIVE · {allTxns.length} TRANSACTIONS{uploadedTxns.length > 0 ? ' (CSV)' : ' · TODAY 09:00–10:00'}</span>
           </div>
+
+          {/* Upload controls */}
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <button onClick={() => setShowUploadZone(v => !v)} title="Upload CSV" style={{
+              padding: '4px 10px', background: showUploadZone ? 'rgba(255,107,0,0.15)' : 'rgba(255,255,255,0.04)',
+              border: `1px solid ${showUploadZone ? C.orange : C.border}`, borderRadius: 2, color: showUploadZone ? C.orange : C.textDim,
+              fontFamily: C.mono, fontSize: 9, letterSpacing: '0.08em', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: 5,
+            }}>
+              <Upload size={10} /> UPLOAD CSV
+            </button>
+            <button onClick={() => handleCSV(SAMPLE_CSV)} title="Load sample CSV" style={{
+              padding: '4px 10px', background: 'rgba(255,255,255,0.04)',
+              border: `1px solid ${C.border}`, borderRadius: 2, color: C.textDim,
+              fontFamily: C.mono, fontSize: 9, letterSpacing: '0.08em', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: 5,
+            }}>
+              <FileText size={10} /> SAMPLE
+            </button>
+            {uploadedTxns.length > 0 && (
+              <button onClick={() => { setUploadedTxns([]); setParseErrors([]); setActionDone({}); setSelected(TRANSACTIONS[2]); }} style={{
+                padding: '4px 10px', background: 'rgba(255,59,59,0.08)',
+                border: `1px solid ${C.red}40`, borderRadius: 2, color: C.red,
+                fontFamily: C.mono, fontSize: 9, letterSpacing: '0.08em', cursor: 'pointer',
+              }}>
+                RESET
+              </button>
+            )}
+          </div>
+
           <div style={{ flex: 1 }} />
           {/* Filter tabs */}
           {(['ALL', 'CLEAR', 'REVIEW', 'FLAGGED'] as const).map(f => {
-            const counts = { ALL: TRANSACTIONS.length, CLEAR: TRANSACTIONS.filter(t => t.status === 'CLEAR').length, REVIEW: TRANSACTIONS.filter(t => t.status === 'REVIEW').length, FLAGGED: TRANSACTIONS.filter(t => t.status === 'FLAGGED').length };
+            const counts = { ALL: allTxns.length, CLEAR: allTxns.filter(t => t.status === 'CLEAR').length, REVIEW: allTxns.filter(t => t.status === 'REVIEW').length, FLAGGED: allTxns.filter(t => t.status === 'FLAGGED').length };
             const statusC = f === 'ALL' ? C.textDim : STATUS_CONFIG[f]?.color || C.textDim;
             return (
               <button
@@ -159,8 +308,49 @@ export function FraudDetect() {
           })}
         </div>
 
+        {/* Drag/Drop Upload Zone */}
+        {showUploadZone && (
+          <div
+            onDragOver={e => { e.preventDefault(); setIsDragging(true); }}
+            onDragLeave={() => setIsDragging(false)}
+            onDrop={handleFileDrop}
+            onClick={() => fileInputRef.current?.click()}
+            style={{
+              margin: '0 20px', padding: '20px',
+              border: `2px dashed ${isDragging ? C.orange : C.border}`,
+              borderRadius: 4, textAlign: 'center', cursor: 'pointer',
+              background: isDragging ? 'rgba(255,107,0,0.06)' : 'rgba(255,255,255,0.02)',
+              transition: 'all 0.2s',
+            }}
+          >
+            <Upload size={20} color={isDragging ? C.orange : C.textDim} style={{ marginBottom: 8 }} />
+            <div style={{ fontFamily: C.mono, fontSize: 10, color: isDragging ? C.orange : C.textDim, marginBottom: 4 }}>
+              {isDragging ? 'DROP CSV HERE' : 'DRAG & DROP CSV FILE OR CLICK TO BROWSE'}
+            </div>
+            <div style={{ fontFamily: C.mono, fontSize: 9, color: C.textDim, opacity: 0.6 }}>
+              Required columns: id, amount, merchant · Optional: channel, fraudscore · Max {MAX_CSV_ROWS} rows
+            </div>
+            <input ref={fileInputRef} type="file" accept=".csv" style={{ display: 'none' }} onChange={handleFileSelect} />
+          </div>
+        )}
+
+        {/* Parse Error Summary */}
+        {parseErrors.length > 0 && (
+          <div style={{
+            margin: '0 20px', padding: '8px 12px',
+            background: 'rgba(255,59,59,0.06)', border: `1px solid ${C.red}40`, borderRadius: 2,
+          }}>
+            <div style={{ fontFamily: C.mono, fontSize: 9, color: C.red, letterSpacing: '0.1em', marginBottom: 4 }}>
+              PARSE WARNINGS ({parseErrors.length})
+            </div>
+            {parseErrors.map((e, i) => (
+              <div key={i} style={{ fontFamily: C.mono, fontSize: 9, color: C.textDim, padding: '2px 0' }}>• {e}</div>
+            ))}
+          </div>
+        )}
+
         {/* Table */}
-        <div style={{ flex: 1, overflowY: 'auto' }}>
+        <div data-fraud-table-wrap style={{ flex: 1, overflowY: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
               <tr style={{ background: C.bgPanel, borderBottom: `1px solid ${C.border}` }}>
@@ -264,7 +454,7 @@ export function FraudDetect() {
       </div>
 
       {/* Detail Drawer */}
-      <div style={{
+      <div data-fraud-drawer style={{
         width: drawerOpen && selected ? 360 : 0,
         transition: 'width 0.25s ease',
         overflow: 'hidden',
@@ -499,6 +689,56 @@ export function FraudDetect() {
                   <span style={{ fontFamily: C.mono, fontSize: 10, color: actionDone[selected.id] === 'APPROVED' ? C.green : actionDone[selected.id] === 'BLOCKED' ? C.red : C.yellow }}>
                     ✓ ACTION RECORDED: {actionDone[selected.id]}
                   </span>
+                </div>
+              )}
+
+              {/* ── Audit Timeline ─────────────────────────────────── */}
+              {auditLog.length > 0 && (
+                <div style={{
+                  marginTop: 16,
+                  background: C.bgCard,
+                  border: `1px solid ${C.border}`,
+                  borderRadius: 2,
+                  padding: '12px',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+                    <Clock size={11} color={C.cyan} />
+                    <span style={{ fontFamily: C.mono, fontSize: 9, color: C.cyan, letterSpacing: '0.12em' }}>
+                      AUDIT TIMELINE ({auditLog.length})
+                    </span>
+                  </div>
+                  <div style={{ maxHeight: 160, overflowY: 'auto' }}>
+                    {[...auditLog].reverse().map((entry, i) => {
+                      const actionColor = entry.action === 'APPROVED' ? C.green
+                        : entry.action === 'BLOCKED' ? C.red
+                        : entry.action === 'ESCALATED' ? C.yellow
+                        : C.textDim;
+                      const age = Date.now() - entry.time;
+                      const ageStr = age < 60_000 ? `${Math.floor(age / 1000)}s ago` : `${Math.floor(age / 60_000)}m ago`;
+                      return (
+                        <div key={i} style={{
+                          display: 'flex', alignItems: 'flex-start', gap: 8, padding: '5px 0',
+                          borderBottom: i < auditLog.length - 1 ? `1px solid ${C.border}` : 'none',
+                        }}>
+                          <div style={{
+                            width: 6, height: 6, borderRadius: '50%',
+                            background: actionColor, marginTop: 3, flexShrink: 0,
+                          }} />
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontFamily: C.mono, fontSize: 9, color: actionColor }}>
+                              {entry.action}
+                              {entry.txnId !== '-' && (
+                                <span style={{ color: C.textDim }}> — {entry.txnId}</span>
+                              )}
+                            </div>
+                            <div style={{ fontFamily: C.mono, fontSize: 8, color: C.textDim, opacity: 0.6, marginTop: 1 }}>
+                              {entry.user} · {ageStr}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </div>
