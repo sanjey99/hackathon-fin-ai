@@ -1,6 +1,9 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import { evaluateFusion } from './fusion/fusionEvaluator.js';
+import { getActiveProfile, setActiveProfile, VALID_PROFILE_NAMES } from './fusion/policyProfiles.js';
+import { validateFusionInput, validateProfileInput } from './fusion/schema.js';
 
 dotenv.config();
 const app = express();
@@ -279,6 +282,49 @@ app.post('/api/portfolio/optimize', async (req, res) => {
     error_rate:                mcResult.error_rate,
     timestamp:                 new Date().toISOString(),
   });
+});
+
+// ── Governance: Fusion Config ────────────────────────────────────────────────
+
+// GET /api/governance/fusion/config — return active policy profile
+app.get('/api/governance/fusion/config', (_req, res) => {
+  const profile = getActiveProfile();
+  return res.json({
+    ok: true,
+    profile: profile.name,
+    details: profile,
+    valid_profiles: VALID_PROFILE_NAMES,
+    ts: new Date().toISOString(),
+  });
+});
+
+// POST /api/governance/fusion/config — switch active policy profile
+app.post('/api/governance/fusion/config', (req, res) => {
+  const validationError = validateProfileInput(req.body);
+  if (validationError) {
+    return res.status(400).json(errBody(validationError, 'input validation'));
+  }
+  const result = setActiveProfile(req.body.profile);
+  if (!result.ok) {
+    return res.status(400).json(errBody(result.error, 'profile switch'));
+  }
+  const profile = getActiveProfile();
+  return res.json({
+    ok: true,
+    profile: profile.name,
+    details: profile,
+    ts: new Date().toISOString(),
+  });
+});
+
+// POST /api/governance/fusion/evaluate — run fusion evaluation
+app.post('/api/governance/fusion/evaluate', (req, res) => {
+  const validationError = validateFusionInput(req.body);
+  if (validationError) {
+    return res.status(400).json(errBody(validationError, 'input validation'));
+  }
+  const result = evaluateFusion(req.body);
+  return res.json({ ok: true, ...result });
 });
 
 // ── Start ─────────────────────────────────────────────────────────────────────
